@@ -1,6 +1,6 @@
 # Build & deploy to the simple-server cluster (Clashboard pattern):
 # push to main → CI → docker build+push ghcr.io short-sha → bump
-# apps/hypertube/values.yaml in Bombatomica64/simple-server → ArgoCD syncs.
+# apps/hypertube/values.yaml in CodeDrevia/simple-server → ArgoCD syncs.
 #
 # Required repo secret: GITOPS_PAT (PAT with repo scope on simple-server).
 
@@ -13,8 +13,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-  GITOPS_REPO_OWNER: Bombatomica64
+  IMAGE_NAME: x2borgo/hypertube  # ghcr names must be lowercase
+  GITOPS_REPO_OWNER: CodeDrevia
   GITOPS_REPO_NAME: simple-server
 
 jobs:

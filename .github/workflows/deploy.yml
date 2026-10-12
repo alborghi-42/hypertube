@@ -1,0 +1,113 @@
+# Build & deploy to the simple-server cluster (Clashboard pattern):
+# push to main → CI → docker build+push ghcr.io short-sha → bump
+# apps/hypertube/values.yaml in Bombatomica64/simple-server → ArgoCD syncs.
+#
+# Required repo secret: GITOPS_PAT (PAT with repo scope on simple-server).
+
+name: Build and Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  GITOPS_REPO_OWNER: Bombatomica64
+  GITOPS_REPO_NAME: simple-server
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+
+      - name: Backend vet + test
+        working-directory: backend
+        run: |
+          go vet ./...
+          go test ./...
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Frontend build (fails on warnings-as-errors config)
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+  build:
+    needs: ci
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image-tag: ${{ steps.sha.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate image tag (short commit SHA)
+        id: sha
+        run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ env.IMAGE_NAME }}:${{ steps.sha.outputs.sha }}
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout GitOps repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.GITOPS_REPO_OWNER }}/${{ env.GITOPS_REPO_NAME }}
+          token: ${{ secrets.GITOPS_PAT }}
+
+      - name: Update app image tag in values.yaml
+        run: |
+          APP="${{ github.event.repository.name }}"
+          NEW_TAG="${{ needs.build.outputs.image-tag }}"
+          VALUES_FILE="apps/${APP}/values.yaml"
+
+          if [ ! -f "${VALUES_FILE}" ]; then
+            echo "ERROR: ${VALUES_FILE} not found!"
+            exit 1
+          fi
+
+          sed -i "s|tag:.*|tag: \"${NEW_TAG}\"|" "${VALUES_FILE}"
+          echo "Updated ${VALUES_FILE} with tag: ${NEW_TAG}"
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add apps/*/values.yaml
+          if git diff-index --quiet HEAD --; then
+            echo "No changes to commit"
+          else
+            git commit -m "ci: bump hypertube to ${{ needs.build.outputs.image-tag }}"
+            git push
+          fi

@@ -1,0 +1,6 @@
+# Dev-only image: hot reload with air, ffmpeg available for the stream pipeline.
+FROM golang:1.25-alpine
+RUN apk add --no-cache ffmpeg git
+RUN go install github.com/air-verse/air@latest
+WORKDIR /app
+CMD ["air", "-c", ".air.toml"]

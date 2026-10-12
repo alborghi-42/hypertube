@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: hypertube
+      POSTGRES_USER: hypertube
+      POSTGRES_PASSWORD: hypertube
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hypertube"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://hypertube:hypertube@postgres:5432/hypertube?sslmode=disable
+      PORT: "8080"
+      DATA_DIR: /data
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/app
+      - media-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm ci && npx ng serve --host 0.0.0.0 --proxy-config proxy.conf.docker.json"
+    ports:
+      - "4200:4200"
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  media-data:
+  frontend-node-modules:

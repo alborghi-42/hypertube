@@ -1,0 +1,11 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "go build -o ./tmp/hypertube ./cmd/hypertube"
+bin = "./tmp/hypertube"
+include_ext = ["go", "sql"]
+exclude_dir = ["tmp"]
+
+[log]
+time = true

@@ -1,0 +1,24 @@
+# Secrets — committing credentials is an automatic 0 for the 42 project
+.env
+.env.*
+!.env.example
+
+# Build artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+backend/tmp/
+backend/bin/
+
+# Local media/data
+data/
+downloads/
+
+# Editor/OS
+.vscode/
+.idea/
+.DS_Store
+
+# 42 subjects are private (symlink to ../subjects)
+subject
+*.subject.pdf

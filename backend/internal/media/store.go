@@ -8,7 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"github.com/X2Borgo/hypertube/backend/internal/repository"
+	"github.com/alborghi-42/hypertube/backend/internal/repository"
 )
 
 // ErrNotFound is returned by Store when the row does not exist.

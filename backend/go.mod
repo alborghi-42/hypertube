@@ -1,4 +1,4 @@
-module github.com/X2Borgo/hypertube/backend
+module github.com/alborghi-42/hypertube/backend
 
 go 1.25.0
 

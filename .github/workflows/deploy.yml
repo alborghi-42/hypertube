@@ -13,7 +13,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: x2borgo/hypertube  # ghcr names must be lowercase
+  IMAGE_NAME: alborghi-42/hypertube  # ghcr names must be lowercase
   GITOPS_REPO_OWNER: CodeDrevia
   GITOPS_REPO_NAME: simple-server
 

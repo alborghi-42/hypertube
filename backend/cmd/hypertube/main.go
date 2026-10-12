@@ -19,8 +19,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/X2Borgo/hypertube/backend/internal/config"
-	"github.com/X2Borgo/hypertube/backend/internal/media"
+	"github.com/alborghi-42/hypertube/backend/internal/config"
+	"github.com/alborghi-42/hypertube/backend/internal/media"
 )
 
 // Hypertube entrypoint. The Go server is the single public process (PID 1 in

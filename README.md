@@ -17,6 +17,23 @@ This replaces the deprecated prototype embedded in Clashboard
 - **Torrenting** uses the `anacrolix/torrent` client library; streaming, piece prioritization and
   the ffmpeg transcode pipeline (HLS for non-mp4/webm, mkv required) are implemented here.
 
+## API
+
+Ported from the Clashboard `media-service`. Media routes are only mounted when `DATABASE_URL` is set.
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/media?page=&rows=&provider=` | Popular feature films |
+| `GET /api/media/search?q=&page=&rows=&provider=` | Search (archive.org items with a torrent) |
+| `GET /api/media/details?external_id=&provider=` | Metadata, cached in `media` on first access |
+| `GET /api/media/play?external_id=&provider=` | Start the background download; returns `{status, url}` once 5% is on disk (200) or after 15s (202) |
+| `GET/POST /api/media/:mediaId/comments`, `GET/PATCH/DELETE /api/media/:mediaId/comments/:commentId` | Comments (no auth yet: placeholder author, no ownership check) |
+| `GET /stream/files/<provider>/<file>` | Downloaded files (Range requests supported), stored under `$DATA_DIR/downloads` |
+
+`provider` defaults to `archive.org`. `OMDB_API_KEY` (optional) adds IMDb rating/actors.
+
+Frontend: `/` is the browse feed, `/watch/:id` opens the player for an item.
+
 ## Development
 
 ```sh

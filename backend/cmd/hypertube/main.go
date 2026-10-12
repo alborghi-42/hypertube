@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/X2Borgo/hypertube/backend/internal/config"
+	"github.com/X2Borgo/hypertube/backend/internal/media"
 )
 
 // Hypertube entrypoint. The Go server is the single public process (PID 1 in
@@ -64,6 +66,15 @@ func main() {
 		api.GET("/ping", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"message": "pong"})
 		})
+	}
+	stream := router.Group("/stream")
+
+	if pool != nil {
+		downloadDir := filepath.Join(cfg.DataDir, "downloads")
+		providers := media.NewRegistry(media.NewArchiveOrg(downloadDir, cfg.OMDBAPIKey, log))
+		media.NewHandler(media.NewStore(pool), providers, downloadDir, log).RegisterRoutes(api, stream)
+	} else {
+		log.Warn("media routes disabled: they require DATABASE_URL")
 	}
 
 	// Everything that is not /api, /stream or /healthz is the Angular app.

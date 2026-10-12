@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 )
 
 // Config holds all runtime configuration, sourced from environment variables
@@ -15,6 +16,7 @@ type Config struct {
 	SSRCommand  string // If set, command to spawn the SSR server (production image)
 	DataDir     string // Root for torrent/hls/subtitle storage (PVC in production)
 	OMDBAPIKey  string // Optional: enriches media with IMDb rating/actors; empty skips it
+	BasePath    string // Public path prefix (e.g. /hypertube behind the portal); empty = served at /
 }
 
 func Load() Config {
@@ -25,6 +27,7 @@ func Load() Config {
 		SSRCommand:  os.Getenv("SSR_COMMAND"),
 		DataDir:     envStr("DATA_DIR", "/data"),
 		OMDBAPIKey:  os.Getenv("OMDB_API_KEY"),
+		BasePath:    strings.TrimRight(os.Getenv("BASE_PATH"), "/"),
 	}
 }
 

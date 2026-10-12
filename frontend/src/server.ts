@@ -9,6 +9,9 @@ import { join } from 'node:path';
 
 const browserDistFolder = join(import.meta.dirname, '../browser');
 
+// Public path prefix, matching the --base-href the browser app was built with.
+const basePath = (process.env['BASE_PATH'] || '').replace(/\/+$/, '');
+
 const app = express();
 const angularApp = new AngularNodeAppEngine();
 
@@ -28,6 +31,7 @@ const angularApp = new AngularNodeAppEngine();
  * Serve static files from /browser
  */
 app.use(
+  basePath || '/',
   express.static(browserDistFolder, {
     maxAge: '1y',
     index: false,

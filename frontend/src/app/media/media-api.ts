@@ -1,7 +1,10 @@
 import { Injectable } from '@angular/core';
 
-/** Same-origin API base: proxied to the Go backend by `ng serve` (proxy.conf.json) and in production. */
-const API_BASE = '/api';
+/**
+ * Same-origin API base, relative to <base href> so it follows the deploy prefix (/hypertube/api):
+ * proxied to the Go backend by `ng serve` (proxy.conf.json) and in production.
+ */
+const API_BASE = 'api';
 
 export const DEFAULT_PROVIDER = 'archive.org';
 
@@ -84,7 +87,8 @@ export class MediaApi {
       return null;
     }
     const payload = (await response.json()) as MediaPlayResponse;
-    const url = payload.url?.trim() ?? '';
+    // The backend answers root-relative ("/stream/files/..."): resolve it against <base href> instead.
+    const url = payload.url?.trim().replace(/^\/+/, '') ?? '';
     return url.length > 0 ? url : null;
   }
 }

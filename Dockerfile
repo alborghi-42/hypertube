@@ -7,7 +7,9 @@ WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
-RUN npm run build
+# Public path prefix, e.g. /hypertube/ behind the 42 portal.
+ARG BASE_HREF=/
+RUN npm run build -- --base-href "$BASE_HREF"
 
 # --- Stage 2: build the Go backend ---
 FROM golang:1.25-alpine AS backend-build
@@ -19,6 +21,7 @@ RUN CGO_ENABLED=0 go build -o /out/hypertube ./cmd/hypertube
 
 # --- Stage 3: runtime ---
 FROM node:22-alpine
+ARG BASE_HREF=/
 RUN apk add --no-cache ffmpeg
 WORKDIR /app
 COPY --from=backend-build /out/hypertube /app/hypertube
@@ -29,7 +32,8 @@ ENV PORT=8080 \
     SSR_PORT=4000 \
     SSR_UPSTREAM=http://127.0.0.1:4000 \
     SSR_COMMAND="node /app/frontend/server/server.mjs" \
-    DATA_DIR=/data
+    DATA_DIR=/data \
+    BASE_PATH=$BASE_HREF
 
 RUN mkdir -p /data && chown -R node:node /data /app
 USER node

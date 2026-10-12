@@ -82,7 +82,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
-		Handler:           router,
+		Handler:           withBasePath(cfg.BasePath, router),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
@@ -144,6 +144,30 @@ func ssrProxy(cfg config.Config, log *slog.Logger) gin.HandlerFunc {
 		w.WriteHeader(http.StatusBadGateway)
 	}
 	return func(c *gin.Context) {
+		// The SSR app is built with the base path as its base href and expects it back.
+		c.Request.URL.Path = cfg.BasePath + c.Request.URL.Path
+		c.Request.URL.RawPath = ""
 		proxy.ServeHTTP(c.Writer, c.Request)
 	}
+}
+
+// withBasePath serves the app under basePath (the portal forwards /hypertube/... unchanged):
+// the prefix is stripped before routing, /healthz stays reachable at the root for probes.
+func withBasePath(basePath string, next http.Handler) http.Handler {
+	if basePath == "" {
+		return next
+	}
+	stripped := http.StripPrefix(basePath, next)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == basePath:
+			http.Redirect(w, r, basePath+"/", http.StatusMovedPermanently)
+		case strings.HasPrefix(r.URL.Path, basePath+"/"):
+			stripped.ServeHTTP(w, r)
+		case r.URL.Path == "/healthz":
+			next.ServeHTTP(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})
 }

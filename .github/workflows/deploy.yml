@@ -77,7 +77,8 @@ jobs:
 
   deploy:
     needs: build
-    if: github.ref == 'refs/heads/main'
+    # Disabled: no auto-deploy for now. Re-enable by restoring: github.ref == 'refs/heads/main'
+    if: false
     runs-on: ubuntu-latest
     steps:
       - name: Checkout GitOps repository

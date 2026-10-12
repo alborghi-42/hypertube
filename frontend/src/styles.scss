@@ -1,1 +1,45 @@
-/* You can add global styles to this file, and also import other style files */
+/* Global design tokens (ported from the Clashboard theme the Hypertube page used). */
+:root {
+  color-scheme: dark;
+
+  --ht-bg-0: oklch(17.39% 0.005 258.8);
+  --ht-bg-1: oklch(23.77% 0.005 258.8);
+  --ht-text-0: oklch(97.28% 0.003 258.8);
+  --ht-text-1: oklch(70.08% 0.009 258.8);
+  --ht-text-2: oklch(53.26% 0.011 258.8);
+  --ht-accent: oklch(69.83% 0.17 165.4);
+  --ht-accent-soft: oklch(69.83% 0.17 165.4 / 0.08);
+  --ht-danger: oklch(62.8% 0.15 25.4);
+  --ht-warning: oklch(77% 0.15 85);
+  --ht-warning-soft: oklch(77% 0.15 85 / 0.1);
+  --ht-border: oklch(33.09% 0.01 258.8);
+  --ht-border-bold: oklch(40.42% 0.012 258.8);
+
+  --ht-font-display: 'Syne', sans-serif;
+  --ht-font-body: 'Outfit', system-ui, sans-serif;
+  --ht-font-mono: 'JetBrains Mono', monospace;
+
+  --ht-space-xs: clamp(0.5rem, 0.4vw + 0.4rem, 0.75rem);
+  --ht-space-sm: clamp(1rem, 0.8vw + 0.8rem, 1.5rem);
+  --ht-space-md: clamp(2rem, 1.5vw + 1.5rem, 3rem);
+  --ht-space-lg: clamp(4rem, 3vw + 3rem, 6rem);
+
+  --ht-radius-sharp: 0px;
+  --ht-radius-sm: 2px;
+
+  --ht-ease: cubic-bezier(0.19, 1, 0.22, 1);
+  --ht-transition-fast: 0.2s var(--ht-ease);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--ht-bg-0);
+  color: var(--ht-text-0);
+  font-family: var(--ht-font-body);
+}

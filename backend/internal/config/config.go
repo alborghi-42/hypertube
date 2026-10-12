@@ -14,6 +14,7 @@ type Config struct {
 	SSRUpstream string // Base URL of the Angular SSR server we reverse-proxy to
 	SSRCommand  string // If set, command to spawn the SSR server (production image)
 	DataDir     string // Root for torrent/hls/subtitle storage (PVC in production)
+	OMDBAPIKey  string // Optional: enriches media with IMDb rating/actors; empty skips it
 }
 
 func Load() Config {
@@ -23,6 +24,7 @@ func Load() Config {
 		SSRUpstream: envStr("SSR_UPSTREAM", "http://127.0.0.1:4000"),
 		SSRCommand:  os.Getenv("SSR_COMMAND"),
 		DataDir:     envStr("DATA_DIR", "/data"),
+		OMDBAPIKey:  os.Getenv("OMDB_API_KEY"),
 	}
 }
 

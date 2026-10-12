@@ -1,0 +1,162 @@
+<main class="hypertube-shell">
+  <header class="hypertube-header">
+    <p class="status-line">Hypertube // Video Feed</p>
+    <h1>Discover, Search, Watch</h1>
+    <p class="subtitle">
+      Legal films from the Internet Archive, streamed while the server downloads them.
+    </p>
+  </header>
+
+  <div class="search-area" role="search" aria-label="Hypertube search">
+    <label class="sr-only" for="hypertube-search">Search videos</label>
+    <input
+      id="hypertube-search"
+      type="search"
+      [value]="searchQuery()"
+      (input)="onSearchInput($event)"
+      placeholder="Search Hypertube"
+      aria-label="Search Hypertube videos"
+    />
+  </div>
+
+  <div class="category-row" aria-label="Video categories">
+    @for (category of categories(); track category) {
+      <button
+        type="button"
+        class="category-pill"
+        [class.active]="category === effectiveCategory()"
+        (click)="selectCategory(category)"
+      >
+        {{ category }}
+      </button>
+    }
+  </div>
+
+  @if (mediaResource.isLoading() && !allDocs().length) {
+    <div class="resource-state" aria-live="polite">
+      <h2>Loading media feed...</h2>
+      <p>Pulling the latest catalog from the Internet Archive.</p>
+    </div>
+  } @else if (mediaResource.error() && !allDocs().length) {
+    <div class="resource-state error" aria-live="assertive">
+      <h2>Could not load media feed</h2>
+      <p>The media API did not respond correctly.</p>
+      <button type="button" class="retry-btn" (click)="reloadMedia()">Retry</button>
+    </div>
+  } @else {
+    <section class="video-grid" aria-label="Video results">
+      @for (video of filteredVideos(); track video.id) {
+        <article
+          class="video-card"
+          title="{{ video.title }}"
+          aria-label="Video titled {{ video.title }} by {{ video.channel }}"
+          role="button"
+          tabindex="0"
+          (click)="openVideoModal(video.id)"
+          (keydown.enter)="openVideoModal(video.id)"
+          (keydown.space)="openVideoModal(video.id); $event.preventDefault()"
+        >
+          <div class="thumbnail" [style.--video-accent]="video.accent">
+            <img class="thumb-image" [src]="video.thumbnailUrl" [alt]="video.title" loading="lazy" />
+          </div>
+          <div class="video-meta" aria-label="Video details">
+            <h2>{{ video.title }}</h2>
+            <p class="channel">{{ video.channel }}</p>
+            <p class="stats">{{ video.category }} | {{ video.published }}</p>
+          </div>
+        </article>
+      } @empty {
+        <div class="empty-state">
+          <h2>No videos found</h2>
+          <p>Try a broader search term or switch back to the All category.</p>
+        </div>
+      }
+    </section>
+
+    @if (isLoadingMore()) {
+      <div class="load-more-state" aria-live="polite" aria-label="Loading more videos">
+        <span class="load-more-spinner"></span>
+        <span>Loading more...</span>
+      </div>
+    } @else if (mediaResource.error()) {
+      <div class="load-more-state error" aria-live="assertive">
+        <span>Failed to load next page.</span>
+        <button type="button" class="retry-btn" (click)="reloadMedia()">Retry</button>
+      </div>
+    } @else if (!hasMore() && allDocs().length) {
+      <p class="end-of-feed">// end of feed</p>
+    }
+
+    @if (selectedVideo(); as activeVideo) {
+      <div class="video-modal-backdrop" (pointerdown)="onModalBackdropClick($event)">
+        <section
+          class="video-modal"
+          role="dialog"
+          aria-modal="true"
+          [attr.aria-label]="'Streaming ' + activeVideo.title"
+        >
+          <header class="video-modal-header">
+            <h2>{{ activeVideo.title }}</h2>
+            <button
+              type="button"
+              class="video-modal-close"
+              (click)="closeVideoModal()"
+              aria-label="Close video player"
+            >
+              Close
+            </button>
+          </header>
+
+          <div class="video-player-wrap">
+            @if (selectedVideoStreamUrl(); as streamUrl) {
+              <video class="video-player" [src]="streamUrl" controls autoplay playsinline></video>
+            } @else if (selectedVideoHasStreamError()) {
+              <div class="resource-state error" aria-live="assertive">
+                <h3>Unable to load stream</h3>
+                <p>The server could not provide a stream URL for this video.</p>
+              </div>
+            } @else {
+              <div class="video-player-loading" aria-live="polite" aria-label="Loading video player">
+                <div class="video-player-loading-surface">
+                  <span class="video-player-loader" aria-hidden="true"></span>
+                  <p>Loading video player...</p>
+                </div>
+              </div>
+            }
+          </div>
+
+          <section class="video-modal-details" aria-label="Media details">
+            <p class="video-modal-meta video-modal-meta-primary">
+              {{ activeVideo.category }} | {{ activeVideo.published }} |
+              <a [href]="activeVideo.detailsUrl" target="_blank" rel="noopener noreferrer"
+                >Open on Archive.org</a
+              >
+            </p>
+
+            @if (selectedVideoDetailsResource.isLoading()) {
+              <p class="video-modal-meta video-modal-meta-status">Loading details...</p>
+            } @else if (selectedVideoDetailsResource.error()) {
+              <p class="video-modal-meta video-modal-meta-status">Could not load media details.</p>
+            } @else if (selectedVideoDetails(); as details) {
+              @if (details.description?.trim()) {
+                <p class="video-modal-description">{{ details.description }}</p>
+              }
+
+              <div class="video-modal-detail-row" aria-label="Extended media metadata">
+                <span class="video-modal-detail-chip">{{
+                  details.creator?.trim() || activeVideo.channel
+                }}</span>
+                <span class="video-modal-detail-chip">{{ formatPublishedDate(details.date) }}</span>
+                <span class="video-modal-detail-chip">{{
+                  formatDuration(details.duration_seconds)
+                }}</span>
+              </div>
+            }
+          </section>
+        </section>
+      </div>
+    }
+  }
+
+  <div #sentinel class="scroll-sentinel" aria-hidden="true"></div>
+</main>

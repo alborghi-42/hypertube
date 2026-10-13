@@ -8,10 +8,15 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/anacrolix/torrent/metainfo"
 )
+
+// archiveClient bounds every archive.org call so an outage cannot hang a request.
+var archiveClient = &http.Client{Timeout: 20 * time.Second}
 
 // ArchiveOrg implements Provider for archive.org.
 type ArchiveOrg struct {
@@ -29,9 +34,24 @@ func thumbnailURL(id string) string {
 	return fmt.Sprintf("https://archive.org/services/img/%s?size=200", id)
 }
 
-// FetchPopular returns popular feature films.
+// FetchPopular returns the most downloaded feature films.
 func (a *ArchiveOrg) FetchPopular(ctx context.Context, page, rows int) ([]Media, error) {
-	return a.Search(ctx, "mediatype:movies AND collection:feature_films", page, rows)
+	return a.search(ctx, "mediatype:movies AND collection:feature_films", "downloads desc", page, rows)
+}
+
+// luceneSpecial are the characters with meaning in archive.org's Lucene
+// query syntax; user input escapes them so it is matched as plain text.
+const luceneSpecial = `+-&|!(){}[]^"~*?:\\/`
+
+func escapeLucene(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if strings.ContainsRune(luceneSpecial, r) {
+			b.WriteByte('\\')
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }
 
 func (a *ArchiveOrg) fetchMetadata(ctx context.Context, id string) (*archiveMetadata, error) {
@@ -40,7 +60,7 @@ func (a *ArchiveOrg) fetchMetadata(ctx context.Context, id string) (*archiveMeta
 	if err != nil {
 		return nil, err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := archiveClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -103,17 +123,40 @@ func (a *ArchiveOrg) FetchByID(ctx context.Context, id string) (*Media, error) {
 	}, nil
 }
 
-// Search queries archive.org's advancedsearch for torrent-backed films.
+// Search matches the user's words (escaped, all required) against
+// torrent-backed films, sorted by title.
 func (a *ArchiveOrg) Search(ctx context.Context, query string, page, rows int) ([]Media, error) {
-	searchQuery := fmt.Sprintf("(%s) AND collection:moviesandfilms AND format:(\"Archive BitTorrent\")", query)
-	urlStr := fmt.Sprintf("https://archive.org/advancedsearch.php?q=%s&fl[]=identifier&fl[]=title&fl[]=date&fl[]=publicdate&sort[]=downloads+desc&output=json&rows=%d&page=%d",
-		url.QueryEscape(searchQuery), rows, page)
+	words := strings.Fields(query)
+	for i, w := range words {
+		words[i] = escapeLucene(w)
+	}
+	if len(words) == 0 {
+		return []Media{}, nil
+	}
+	return a.search(ctx, "("+strings.Join(words, " AND ")+")", "titleSorter asc", page, rows)
+}
+
+// search runs a raw Lucene query against archive.org's advancedsearch,
+// restricted to torrent-backed films.
+func (a *ArchiveOrg) search(ctx context.Context, lucene, sortBy string, page, rows int) ([]Media, error) {
+	query := lucene
+	searchQuery := fmt.Sprintf("(%s) AND collection:moviesandfilms AND format:(\"Archive BitTorrent\")", lucene)
+	q := url.Values{}
+	q.Set("q", searchQuery)
+	for _, f := range []string{"identifier", "title", "date", "publicdate"} {
+		q.Add("fl[]", f)
+	}
+	q.Set("sort[]", sortBy)
+	q.Set("output", "json")
+	q.Set("rows", strconv.Itoa(rows))
+	q.Set("page", strconv.Itoa(page))
+	urlStr := "https://archive.org/advancedsearch.php?" + q.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := archiveClient.Do(req)
 	if err != nil {
 		a.log.Error("archive.org search failed", "url", urlStr, "error", err)
 		return nil, err
@@ -170,7 +213,7 @@ func (a *ArchiveOrg) TorrentSource(ctx context.Context, id string) (*TorrentSour
 	if err != nil {
 		return nil, err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := archiveClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

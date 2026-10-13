@@ -98,8 +98,8 @@ export class Browse {
       .filter((doc) => (doc.identifier ?? doc.external_id ?? '').trim().length > 0)
       .map((doc, index): Video => {
         const id = doc.identifier ?? doc.external_id ?? `archive-${index}`;
-        const provider = DEFAULT_PROVIDER;
         const rawChannel = doc.provider?.trim() ?? '';
+        const provider = rawChannel.length > 0 ? rawChannel : DEFAULT_PROVIDER;
         const rawTitle = doc.title?.trim() ?? '';
         const rawCategory = doc.format?.trim() ?? '';
         return {
@@ -111,7 +111,7 @@ export class Browse {
           category: rawCategory.length > 0 ? rawCategory : 'Archive',
           accent: '0.71 0.17 150',
           thumbnailUrl: doc.thumbnailUrl ?? doc.thumbnail_url ?? '',
-          detailsUrl: `https://archive.org/details/${encodeURIComponent(id)}`,
+          detailsUrl: sourceUrl(provider, id),
         };
       }),
   );
@@ -357,4 +357,11 @@ export class Browse {
 
 function cacheKeyOf(params: MediaListParams): string {
   return `${params.query}::${params.page}`;
+}
+
+/** The item's page on its source site. */
+function sourceUrl(provider: string, id: string): string {
+  return provider === 'publicdomaintorrents'
+    ? `https://www.publicdomaintorrents.info/nshowmovie.html?movieid=${encodeURIComponent(id)}`
+    : `https://archive.org/details/${encodeURIComponent(id)}`;
 }

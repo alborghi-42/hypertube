@@ -10,6 +10,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -96,26 +97,68 @@ func pagination(c *gin.Context) (page, rows int, ok bool) {
 	return page, rows, true
 }
 
-// GET /api/media?page=&rows=&provider= — popular media.
+// providerTimeout bounds each provider's share of a merged list/search, so
+// a slow or dead source only drops its own results.
+const providerTimeout = 25 * time.Second
+
+// collect runs fn on the requested provider, or on every provider in
+// parallel when the provider param is absent. Failing providers are logged
+// and skipped; ok is false (and a response written) only if all failed or
+// the provider param is invalid.
+func (h *Handler) collect(c *gin.Context, op string, fn func(context.Context, Provider) ([]Media, error)) (lists [][]Media, ok bool) {
+	ids := h.providers.IDs()
+	if name, set := c.GetQuery("provider"); set {
+		if _, exists := h.providers[name]; !exists {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid provider"})
+			return nil, false
+		}
+		ids = []string{name}
+	}
+	lists = make([][]Media, len(ids))
+	errs := make([]error, len(ids))
+	var wg sync.WaitGroup
+	for i, id := range ids {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(c.Request.Context(), providerTimeout)
+			defer cancel()
+			lists[i], errs[i] = fn(ctx, h.providers[id])
+			if errs[i] != nil {
+				h.log.Error(op+" failed", "provider", id, "error", errs[i])
+			}
+		}()
+	}
+	wg.Wait()
+	for _, err := range errs {
+		if err == nil {
+			return lists, true
+		}
+	}
+	c.JSON(http.StatusBadGateway, gin.H{"error": "Failed to fetch media from provider"})
+	return nil, false
+}
+
+// GET /api/media?page=&rows=&provider= — popular media from every provider
+// (or just ?provider=), each in its own popularity order, deduplicated.
 func (h *Handler) fetchMedia(c *gin.Context) {
 	page, rows, ok := pagination(c)
 	if !ok {
 		return
 	}
-	p, name, ok := h.provider(c)
+	lists, ok := h.collect(c, "fetch popular", func(ctx context.Context, p Provider) ([]Media, error) {
+		return p.FetchPopular(ctx, page, rows)
+	})
 	if !ok {
 		return
 	}
-	result, err := p.FetchPopular(c.Request.Context(), page, rows)
-	if err != nil {
-		h.log.Error("fetch popular failed", "provider", name, "error", err)
-		c.JSON(http.StatusBadGateway, gin.H{"error": "Failed to fetch media from provider"})
-		return
-	}
-	c.JSON(http.StatusOK, result)
+	c.JSON(http.StatusOK, mergeResults(lists, false))
 }
 
-// GET /api/media/search?q=&page=&rows=&provider=
+// GET /api/media/search?q=&page=&rows=&provider= — results from every
+// provider (or just ?provider=), deduplicated by title+year, sorted by name.
+// Each provider is paged independently, so a page holds up to rows results
+// per provider.
 func (h *Handler) searchMedia(c *gin.Context) {
 	query := strings.TrimSpace(c.Query("q"))
 	if query == "" {
@@ -126,17 +169,13 @@ func (h *Handler) searchMedia(c *gin.Context) {
 	if !ok {
 		return
 	}
-	p, name, ok := h.provider(c)
+	lists, ok := h.collect(c, "search", func(ctx context.Context, p Provider) ([]Media, error) {
+		return p.Search(ctx, query, page, rows)
+	})
 	if !ok {
 		return
 	}
-	result, err := p.Search(c.Request.Context(), query, page, rows)
-	if err != nil {
-		h.log.Error("search failed", "provider", name, "error", err)
-		c.JSON(http.StatusBadGateway, gin.H{"error": "Failed to search media from provider"})
-		return
-	}
-	c.JSON(http.StatusOK, result)
+	c.JSON(http.StatusOK, mergeResults(lists, true))
 }
 
 // GET /api/media/details?external_id=&provider= — cached metadata, fetched

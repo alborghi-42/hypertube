@@ -104,7 +104,10 @@ func main() {
 		// engine.PostProcess: mkv/avi conversion hook (ticket 42-16).
 		defer tc.Close()
 		defer engine.Close()
-		providers := media.NewRegistry(media.NewArchiveOrg(cfg.OMDBAPIKey, log))
+		providers := media.NewRegistry(
+			media.NewArchiveOrg(cfg.OMDBAPIKey, log),
+			media.NewPublicDomainTorrents(cfg.OMDBAPIKey, log),
+		)
 		media.NewHandler(store, providers, engine, log).RegisterRoutes(api, authed, stream)
 	} else {
 		log.Warn("auth and media routes disabled: they require DATABASE_URL")

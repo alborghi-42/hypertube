@@ -22,6 +22,12 @@ type Config struct {
 	CookieSecure bool
 	// OAuth login (42 intra, GitHub); see oauth.go.
 	OAuth OAuthConfig
+	// SMTP for password-reset email; empty SMTPHost logs the email instead.
+	SMTPHost     string
+	SMTPPort     int
+	SMTPUser     string
+	SMTPPassword string
+	SMTPFrom     string
 }
 
 func Load() Config {
@@ -35,6 +41,11 @@ func Load() Config {
 		BasePath:     strings.TrimRight(os.Getenv("BASE_PATH"), "/"),
 		CookieSecure: envBool("COOKIE_SECURE", true),
 		OAuth:        loadOAuth(),
+		SMTPHost:     os.Getenv("SMTP_HOST"),
+		SMTPPort:     envInt("SMTP_PORT", 587),
+		SMTPUser:     os.Getenv("SMTP_USER"),
+		SMTPPassword: os.Getenv("SMTP_PASSWORD"),
+		SMTPFrom:     envStr("SMTP_FROM", "hypertube@localhost"),
 	}
 }
 

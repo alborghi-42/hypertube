@@ -45,6 +45,14 @@ type OauthIdentity struct {
 	CreatedAt      pgtype.Timestamptz
 }
 
+type PasswordReset struct {
+	TokenHash []byte
+	UserID    pgtype.UUID
+	ExpiresAt pgtype.Timestamptz
+	UsedAt    pgtype.Timestamptz
+	CreatedAt pgtype.Timestamptz
+}
+
 type Session struct {
 	TokenHash []byte
 	UserID    pgtype.UUID

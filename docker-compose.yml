@@ -33,6 +33,13 @@ services:
       postgres:
         condition: service_healthy
 
+  # Dev SMTP sink for password-reset email; inbox at http://localhost:8025.
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+
   frontend:
     image: node:22-alpine
     working_dir: /app

@@ -21,6 +21,7 @@ import (
 
 	"github.com/alborghi-42/hypertube/backend/internal/auth"
 	"github.com/alborghi-42/hypertube/backend/internal/config"
+	"github.com/alborghi-42/hypertube/backend/internal/mail"
 	"github.com/alborghi-42/hypertube/backend/internal/media"
 )
 
@@ -82,6 +83,8 @@ func main() {
 
 		auth.NewHandler(pool, sessions, log).RegisterRoutes(api, authed)
 		auth.NewOAuth(pool, sessions, cookies, cfg.BasePath, cfg.OAuth, log).RegisterRoutes(api)
+		mailer := mail.New(mail.Config{Host: cfg.SMTPHost, Port: cfg.SMTPPort, User: cfg.SMTPUser, Password: cfg.SMTPPassword, From: cfg.SMTPFrom}, log)
+		auth.NewResetHandler(pool, sessions, mailer, cfg.OAuth.PublicURL, cfg.BasePath, log).RegisterRoutes(api)
 
 		downloadDir := filepath.Join(cfg.DataDir, "downloads")
 		providers := media.NewRegistry(media.NewArchiveOrg(downloadDir, cfg.OMDBAPIKey, log))

@@ -66,6 +66,8 @@ func main() {
 		log.Error("invalid TRUSTED_PROXIES", "error", err)
 		os.Exit(1)
 	}
+	httpsec.ReportURI = cfg.BasePath + "/api/csp-report"
+	router.POST("/api/csp-report", httpsec.CSPReport(log))
 	router.Use(
 		httpsec.Headers(cfg.CookieSecure),
 		httpsec.BodyLimit(httpsec.DefaultBodyLimit, "/api/users/me/avatar"),

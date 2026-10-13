@@ -5,6 +5,8 @@ package httpsec
 
 import (
 	"fmt"
+	"io"
+	"log/slog"
 	"math"
 	"net/http"
 	"os"
@@ -33,7 +35,7 @@ import (
 //   - static.cloudflareinsights.com / cloudflareinsights.com: the Cloudflare
 //     Web Analytics beacon the proxy injects into every HTML page.
 const ContentSecurityPolicy = "default-src 'self'; " +
-	"script-src 'self' 'unsafe-hashes' 'sha256-MhtPZXr7+LpJUY5qtMutB+qWfQtMaPccfe7QXtCcEYc=' 'sha256-kx8Md/dUVxiWxH0xNDfI+0jY+S4Ev2Jri3jBG4rrm9E=' https://static.cloudflareinsights.com; " +
+	"script-src 'self' 'report-sample' 'unsafe-hashes' 'sha256-MhtPZXr7+LpJUY5qtMutB+qWfQtMaPccfe7QXtCcEYc=' 'sha256-kx8Md/dUVxiWxH0xNDfI+0jY+S4Ev2Jri3jBG4rrm9E=' https://static.cloudflareinsights.com; " +
 	"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
 	"font-src 'self' https://fonts.gstatic.com; " +
 	"img-src 'self' data: blob: https:; " +
@@ -44,6 +46,21 @@ const ContentSecurityPolicy = "default-src 'self'; " +
 	"form-action 'self'; " +
 	"frame-ancestors 'none'"
 
+// ReportURI, when set (BASE_PATH + /api/csp-report), makes browsers report CSP
+// violations there; 'report-sample' in script-src adds the blocked code's start.
+var ReportURI string
+
+// CSPReport logs CSP violation reports (application/csp-report or
+// application/reports+json). Mounted outside the CSRF group: browsers send
+// these without the CSRF header.
+func CSPReport(log *slog.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		body, _ := io.ReadAll(io.LimitReader(c.Request.Body, 8<<10))
+		log.Warn("csp violation", "report", string(body), "user_agent", c.Request.UserAgent())
+		c.Status(http.StatusNoContent)
+	}
+}
+
 // Headers sets the security headers. hsts adds Strict-Transport-Security and
 // must only be true when the site is served over https (COOKIE_SECURE).
 func Headers(hsts bool) gin.HandlerFunc {
@@ -52,7 +69,11 @@ func Headers(hsts bool) gin.HandlerFunc {
 		// /stream serves video and subtitle files, not pages: opened directly,
 		// the browser's own media viewer injects scripts the page CSP blocks.
 		if !strings.HasPrefix(c.Request.URL.Path, "/stream/") {
-			h.Set("Content-Security-Policy", ContentSecurityPolicy)
+			csp := ContentSecurityPolicy
+			if ReportURI != "" {
+				csp += "; report-uri " + ReportURI
+			}
+			h.Set("Content-Security-Policy", csp)
 		}
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")

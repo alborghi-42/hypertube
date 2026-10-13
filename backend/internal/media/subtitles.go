@@ -150,7 +150,7 @@ func (s *Subtitles) Ensure(m Media, userLang string) {
 		return
 	}
 	s.mu.Lock()
-	if s.inflight[m.ID] {
+	if s.inflight[m.ID] || s.settledLocked(m.ID, userLang) {
 		s.mu.Unlock()
 		return
 	}
@@ -166,6 +166,24 @@ func (s *Subtitles) Ensure(m Media, userLang string) {
 		defer cancel()
 		s.fetch(ctx, m, userLang)
 	}()
+}
+
+// settledLocked reports whether nothing could be fetched for mediaID: every
+// language wanted at most (English plus userLang, before knowing the film's
+// language) is cached or recently missed. Keeps polls from restarting fetches
+// (and pending from staying true). Caller holds s.mu.
+func (s *Subtitles) settledLocked(mediaID, userLang string) bool {
+	now := time.Now()
+	for _, lang := range wanted(userLang, "") {
+		if p, _ := s.FilePath(mediaID, lang); fileExists(p) {
+			continue
+		}
+		if t, ok := s.misses[mediaID+"/"+lang]; ok && now.Sub(t) < subtitleMissTTL {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 // wanted returns the languages to fetch: English, plus userLang when it is
@@ -197,6 +215,10 @@ func (s *Subtitles) fetch(ctx context.Context, m Media, userLang string) {
 	now := time.Now()
 	var missing []string
 	s.mu.Lock()
+	if userLang != "en" && userLang == original {
+		// Not needed (the film is in the user's language): settled, see settledLocked.
+		s.misses[m.ID+"/"+userLang] = now
+	}
 	for _, lang := range wanted(userLang, original) {
 		p, _ := s.FilePath(m.ID, lang)
 		if fileExists(p) {

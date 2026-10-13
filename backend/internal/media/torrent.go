@@ -245,6 +245,15 @@ func (e *Engine) start(p Provider, m *Media) (*Job, error) {
 		t.Drop()
 		return nil, fmt.Errorf("torrent metadata: %w", ctx.Err())
 	}
+	// Piece completion is persisted separately from the files: when the
+	// torrent's folder was removed (failed download, retention cleanup), the
+	// stored completion is stale, so re-check the (missing) data before use.
+	if _, statErr := os.Stat(filepath.Join(e.tc.cfg.DataDir, t.InfoHash().HexString())); errors.Is(statErr, os.ErrNotExist) {
+		if err := t.VerifyDataContext(ctx); err != nil {
+			t.Drop()
+			return nil, fmt.Errorf("verify torrent data: %w", err)
+		}
+	}
 
 	f := pickVideoFile(t.Files())
 	if f == nil {

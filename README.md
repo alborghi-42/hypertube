@@ -120,6 +120,7 @@ each one). In compose, `.env` feeds both variable substitution and the backend's
 | `TORRENT_SEED` | `false` | keep seeding completed files |
 | `TORRENT_STALL_TIMEOUT` | `10m` | fail a download with no progress for this long; `0` = never |
 | `MEDIA_RETENTION` | `720h` | delete unwatched downloads after this long; `0` = never |
+| `TRUSTED_PROXIES` | _(empty)_ | comma-separated IPs/CIDRs whose `X-Forwarded-For` is trusted (production: the k3s pod CIDR, e.g. `10.42.0.0/16`); empty = trust nobody, so per-IP rate limits see the proxy IP |
 | `FFMPEG_PATH` / `FFPROBE_PATH` | from `PATH` | ffmpeg binaries |
 | `MAX_TRANSCODES` | `2` | concurrent on-the-fly conversions |
 

@@ -13,7 +13,7 @@ import {
 import { TitleStrategy, provideRouter } from '@angular/router';
 
 import { routes } from './app.routes';
-import { provideClientHydration, withEventReplay } from '@angular/platform-browser';
+import { provideClientHydration } from '@angular/platform-browser';
 import { authInterceptor } from './auth/auth.interceptor';
 import { TranslatedTitleStrategy } from './i18n/title-strategy';
 import { provideI18n } from './i18n/transloco';
@@ -23,7 +23,8 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes),
-    provideClientHydration(withEventReplay()),
+    // No event replay: its inline script is blocked by the CSP (see backend/internal/httpsec).
+    provideClientHydration(),
     provideHttpClient(
       withFetch(),
       withInterceptors([authInterceptor]),

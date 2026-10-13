@@ -30,13 +30,15 @@ import (
 //   - img-src https:: posters (archive.org, OMDb/m.media-amazon.com, ...) and
 //     OAuth avatars (GitHub, 42 CDN) come from many https hosts.
 //   - media-src 'self' blob:: the player streams from /stream (and subtitles).
+//   - static.cloudflareinsights.com / cloudflareinsights.com: the Cloudflare
+//     Web Analytics beacon the proxy injects into every HTML page.
 const ContentSecurityPolicy = "default-src 'self'; " +
-	"script-src 'self' 'unsafe-hashes' 'sha256-MhtPZXr7+LpJUY5qtMutB+qWfQtMaPccfe7QXtCcEYc=' 'sha256-kx8Md/dUVxiWxH0xNDfI+0jY+S4Ev2Jri3jBG4rrm9E='; " +
+	"script-src 'self' 'unsafe-hashes' 'sha256-MhtPZXr7+LpJUY5qtMutB+qWfQtMaPccfe7QXtCcEYc=' 'sha256-kx8Md/dUVxiWxH0xNDfI+0jY+S4Ev2Jri3jBG4rrm9E=' https://static.cloudflareinsights.com; " +
 	"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
 	"font-src 'self' https://fonts.gstatic.com; " +
 	"img-src 'self' data: blob: https:; " +
 	"media-src 'self' blob:; " +
-	"connect-src 'self'; " +
+	"connect-src 'self' https://cloudflareinsights.com; " +
 	"object-src 'none'; " +
 	"base-uri 'self'; " +
 	"form-action 'self'; " +
@@ -47,7 +49,11 @@ const ContentSecurityPolicy = "default-src 'self'; " +
 func Headers(hsts bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		h := c.Writer.Header()
-		h.Set("Content-Security-Policy", ContentSecurityPolicy)
+		// /stream serves video and subtitle files, not pages: opened directly,
+		// the browser's own media viewer injects scripts the page CSP blocks.
+		if !strings.HasPrefix(c.Request.URL.Path, "/stream/") {
+			h.Set("Content-Security-Policy", ContentSecurityPolicy)
+		}
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		h.Set("X-Frame-Options", "DENY")

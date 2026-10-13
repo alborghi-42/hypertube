@@ -1,4 +1,4 @@
-.PHONY: dev down migrate-up migrate-down sqlc test lint build-image
+.PHONY: dev down migrate-up migrate-down sqlc test lint build-image seed api-demo
 
 # DATABASE_URL comes from .env when present (see .env.example).
 -include .env
@@ -30,3 +30,12 @@ lint:
 
 build-image:
 	docker build -t hypertube:local .
+
+# Defense kit (docs/defense.md). Needs a running app, curl and jq.
+# Override the target: make seed BASE_URL=https://42.bombatomica64.dev BASE_PATH=/hypertube
+BASE_URL ?= http://localhost:8080
+seed: ## Register the demo users via the real API and print an API client
+	BASE_URL="$(BASE_URL)" BASE_PATH="$(BASE_PATH)" bash scripts/seed.sh
+
+api-demo: ## Assert every public REST API route (/api/v1) end to end
+	BASE_URL="$(BASE_URL)" BASE_PATH="$(BASE_PATH)" bash scripts/api-demo.sh

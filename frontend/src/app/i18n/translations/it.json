@@ -59,6 +59,7 @@
   "oauth": {
     "with42": "Accedi con 42",
     "withGithub": "Accedi con GitHub",
+    "withGoogle": "Accedi con Google",
     "errors": {
       "denied": "L'accesso è stato annullato.",
       "state": "Il link di accesso è scaduto, riprova.",

@@ -104,7 +104,7 @@ which streams the mp4 directly (Range requests, `206 Partial Content`).
 | Requirement | How to demonstrate | Expected |
 | --- | --- | --- |
 | Register with email, username, last name, first name, password | `/register` | account created and logged in |
-| OAuth: 42 + another | `/login` > "42" and "GitHub" (need the client ids in `.env`) | provider consent, back logged in; first time asks for a username if needed |
+| OAuth: 42 + another | `/login` > "42", "GitHub" and "Google" (need the client ids in `.env`) | provider consent, back logged in; first time asks for a username if needed |
 | Login with username + password | `/login` as alice / `Alice-demo-42` | library |
 | Password reset by email | `/forgot-password` with alice@example.com; open Mailpit http://localhost:8025 (or the logged link without `SMTP_HOST`) | link to `/reset-password?...`; new password works, old one does not, other sessions are logged out |
 | One-click logout from any page | header button on library, film page, profile | back to `/login`; browser back does not show protected data |

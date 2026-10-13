@@ -110,6 +110,8 @@ each one). In compose, `.env` feeds both variable substitution and the backend's
 | `PUBLIC_URL` | — | external origin (no path) for OAuth callbacks and reset links |
 | `FORTYTWO_CLIENT_ID` / `FORTYTWO_CLIENT_SECRET` | empty | 42 OAuth (disabled when empty) |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | empty | GitHub OAuth (disabled when empty) |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | empty | Google OpenID Connect login (disabled when empty) |
+| `OIDC_PROVIDER_NAME` / `OIDC_ISSUER` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` | empty | optional extra OIDC provider (endpoints from issuer discovery; routes `/api/auth/<name>/...`) |
 | `SMTP_HOST` | empty | SMTP server; empty logs reset links instead |
 | `SMTP_PORT` | `587` | 465 = implicit TLS, otherwise STARTTLS if offered |
 | `SMTP_USER` / `SMTP_PASSWORD` | empty | SMTP auth |
@@ -128,7 +130,8 @@ each one). In compose, `.env` feeds both variable substitution and the backend's
 | `MAX_TRANSCODES` | `2` | concurrent on-the-fly conversions |
 
 OAuth callback URLs to register at the providers: `PUBLIC_URL + BASE_PATH + /api/auth/42/callback`
-and `.../api/auth/github/callback`.
+`.../api/auth/github/callback` and `.../api/auth/google/callback` (plus
+`.../api/auth/<OIDC_PROVIDER_NAME>/callback` for the optional OIDC provider).
 
 ## Production
 

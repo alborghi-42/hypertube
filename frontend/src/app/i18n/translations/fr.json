@@ -59,6 +59,7 @@
   "oauth": {
     "with42": "Se connecter avec 42",
     "withGithub": "Se connecter avec GitHub",
+    "withGoogle": "Se connecter avec Google",
     "errors": {
       "denied": "La connexion a été annulée.",
       "state": "Le lien de connexion a expiré, veuillez réessayer.",

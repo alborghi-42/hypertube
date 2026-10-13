@@ -9,7 +9,7 @@ import { safeReturnUrl } from '../auth.service';
 const OAUTH_ERRORS = new Set(['denied', 'state', 'email', 'unavailable']);
 
 /**
- * "Log in with 42 / GitHub". Plain links (full-page navigation) to the backend start
+ * "Log in with 42 / GitHub / Google". Plain links (full-page navigation) to the backend start
  * endpoint, relative to <base href> so they follow the deploy prefix. Also shows the
  * error the callback redirects back with (?oauth_error=...).
  */

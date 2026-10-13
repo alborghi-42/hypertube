@@ -37,6 +37,21 @@
   }
 }
 
+.oauth-google {
+  // Google branding: white button, dark text, the multicolour "G" on the left.
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  border-color: #747775;
+  background: #fff;
+  color: #1f1f1f;
+}
+
+.oauth-icon {
+  flex: none;
+}
+
 .oauth-divider {
   margin: 0;
   display: flex;

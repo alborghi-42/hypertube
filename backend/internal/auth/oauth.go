@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -107,7 +109,7 @@ type oauthClient struct {
 	config   *oauth2.Config
 }
 
-// OAuth serves the 42 intra / GitHub login endpoints.
+// OAuth serves the 42 intra / GitHub / Google (+ optional generic OIDC) login endpoints.
 type OAuth struct {
 	db       OAuthDB
 	q        *repository.Queries
@@ -115,6 +117,7 @@ type OAuth struct {
 	cookies  CookieOptions
 	basePath string
 	clients  map[string]*oauthClient
+	routes   []string // provider names with start/callback routes
 	flows    *ttlStore[oauthFlow]
 	signups  *ttlStore[pendingSignup]
 	http     *http.Client
@@ -136,10 +139,34 @@ func NewOAuth(db OAuthDB, sessions *Sessions, cookies CookieOptions, basePath st
 		http:     &http.Client{Timeout: 10 * time.Second},
 		log:      log,
 	}
-	for _, p := range []struct {
+	type enabled struct {
 		provider oauthProvider
 		creds    config.OAuthClient
-	}{{fortyTwoProvider, cfg.FortyTwo}, {gitHubProvider, cfg.GitHub}} {
+	}
+	providers := []enabled{{fortyTwoProvider, cfg.FortyTwo}, {gitHubProvider, cfg.GitHub}, {googleProvider, cfg.Google}}
+	for _, p := range providers {
+		o.routes = append(o.routes, p.provider.name)
+	}
+	if name := cfg.OIDC.Name; name != "" {
+		if err := o.validOIDCName(name); err != nil {
+			log.Error("oidc provider ignored", "provider", name, "error", err)
+		} else {
+			// Routes exist even when discovery fails, so the button reports
+			// "unavailable" instead of a 404.
+			o.routes = append(o.routes, name)
+			if cfg.OIDC.Enabled() {
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				p, err := discoverOIDC(ctx, o.http, name, cfg.OIDC.Issuer)
+				cancel()
+				if err != nil {
+					log.Error("oidc discovery failed, provider disabled", "provider", name, "issuer", cfg.OIDC.Issuer, "error", err)
+				} else {
+					providers = append(providers, enabled{p, cfg.OIDC.OAuthClient})
+				}
+			}
+		}
+	}
+	for _, p := range providers {
 		if !p.creds.Enabled() {
 			log.Info("oauth provider disabled (no credentials)", "provider", p.provider.name)
 			continue
@@ -158,10 +185,24 @@ func NewOAuth(db OAuthDB, sessions *Sessions, cookies CookieOptions, basePath st
 	return o
 }
 
+var oidcNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,31}$`)
+
+// validOIDCName rejects names that are not a clean URL segment or that would
+// collide with a built-in provider or the /auth/oauth/signup route.
+func (o *OAuth) validOIDCName(name string) error {
+	if !oidcNamePattern.MatchString(name) {
+		return errors.New("OIDC_PROVIDER_NAME must match [a-z0-9-], max 32 chars")
+	}
+	if name == "oauth" || slices.Contains(o.routes, name) {
+		return errors.New("OIDC_PROVIDER_NAME is reserved")
+	}
+	return nil
+}
+
 // RegisterRoutes mounts the public OAuth endpoints on api. Routes exist for
 // every provider; disabled ones redirect back to the login page with an error.
 func (o *OAuth) RegisterRoutes(api *gin.RouterGroup) {
-	for _, name := range []string{fortyTwoProvider.name, gitHubProvider.name} {
+	for _, name := range o.routes {
 		api.GET("/auth/"+name+"/start", o.start(name))
 		api.GET("/auth/"+name+"/callback", o.callback(name))
 	}

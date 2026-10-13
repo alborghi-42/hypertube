@@ -2,15 +2,15 @@ services:
   postgres:
     image: postgres:18
     environment:
-      POSTGRES_DB: hypertube
-      POSTGRES_USER: hypertube
-      POSTGRES_PASSWORD: hypertube
+      POSTGRES_DB: ${POSTGRES_DB:-hypertube}
+      POSTGRES_USER: ${POSTGRES_USER:-hypertube}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hypertube"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-hypertube}"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -21,11 +21,14 @@ services:
       dockerfile: Dockerfile.dev
     env_file: .env
     environment:
-      DATABASE_URL: postgres://hypertube:hypertube@postgres:5432/hypertube?sslmode=disable
+      DATABASE_URL: postgres://${POSTGRES_USER:-hypertube}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-hypertube}?sslmode=disable
       PORT: "8080"
       DATA_DIR: /data
     ports:
       - "8080:8080"
+      # BitTorrent peers (TORRENT_LISTEN_PORT), TCP+UDP.
+      - "${TORRENT_LISTEN_PORT:-6881}:${TORRENT_LISTEN_PORT:-6881}/tcp"
+      - "${TORRENT_LISTEN_PORT:-6881}:${TORRENT_LISTEN_PORT:-6881}/udp"
     volumes:
       - ./backend:/app
       - media-data:/data

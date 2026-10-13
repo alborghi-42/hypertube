@@ -1,0 +1,33 @@
+<section class="profile-card">
+  @if (profileResource.isLoading()) {
+    <p>Loading profile...</p>
+  } @else if (notFound()) {
+    <h1>User not found</h1>
+    <p>No user is called "{{ username() }}".</p>
+  } @else if (profileResource.error()) {
+    <p class="form-error" role="alert">Could not load this profile.</p>
+  } @else if (profile(); as user) {
+    <div class="avatar-row">
+      @if (user.avatar_url; as src) {
+        <img
+          class="avatar"
+          [src]="src"
+          [alt]="user.username + '’s profile picture'"
+          width="96"
+          height="96"
+        />
+      } @else {
+        <span class="avatar avatar-placeholder" aria-hidden="true">{{
+          user.username.charAt(0).toUpperCase()
+        }}</span>
+      }
+      <div>
+        <h1>{{ user.username }}</h1>
+        <p class="public-link">{{ user.first_name }} {{ user.last_name }}</p>
+      </div>
+    </div>
+    @if (isSelf()) {
+      <p class="public-link">This is you. <a routerLink="/profile">Edit your profile</a></p>
+    }
+  }
+</section>

@@ -1,0 +1,134 @@
+<section class="profile-card">
+  <h1>Your profile</h1>
+
+  @if (user(); as me) {
+    <div class="avatar-row">
+      @if (shownAvatar(); as src) {
+        <img class="avatar" [src]="src" alt="Your profile picture" width="96" height="96" />
+      } @else {
+        <span class="avatar avatar-placeholder" aria-hidden="true">{{
+          me.username.charAt(0).toUpperCase()
+        }}</span>
+      }
+
+      <div class="avatar-actions">
+        @if (avatarFile()) {
+          <button type="button" class="primary" (click)="uploadAvatar()" [disabled]="uploading()">
+            {{ uploading() ? 'Uploading...' : 'Save picture' }}
+          </button>
+          <button type="button" class="secondary" (click)="cancelAvatar()" [disabled]="uploading()">
+            Cancel
+          </button>
+        } @else {
+          <label class="secondary file-label">
+            Change picture
+            <input
+              type="file"
+              class="sr-only"
+              [accept]="acceptTypes"
+              (change)="onFileSelected($event)"
+            />
+          </label>
+        }
+        <small>JPEG, PNG, WebP or GIF, up to 5 MB.</small>
+        @if (avatarError(); as message) {
+          <p class="field-error" role="alert">{{ message }}</p>
+        }
+      </div>
+    </div>
+
+    <p class="public-link">
+      Others see your profile at
+      <a [routerLink]="['/users', me.username]">/users/{{ me.username }}</a
+      >.
+    </p>
+  }
+
+  <form [formGroup]="form" (ngSubmit)="save()" novalidate>
+    <label class="field">
+      Email
+      <input
+        type="email"
+        formControlName="email"
+        autocomplete="email"
+        [attr.aria-invalid]="controlError(form.controls.email, 'Email') !== null"
+      />
+      @if (controlError(form.controls.email, 'Email'); as message) {
+        <p class="field-error">{{ message }}</p>
+      } @else {
+        <small>Only you can see your email.</small>
+      }
+    </label>
+
+    <label class="field">
+      Username
+      <input
+        type="text"
+        formControlName="username"
+        autocomplete="username"
+        [attr.aria-invalid]="controlError(form.controls.username, 'Username') !== null"
+      />
+      @if (controlError(form.controls.username, 'Username'); as message) {
+        <p class="field-error">{{ message }}</p>
+      }
+    </label>
+
+    <label class="field">
+      First name
+      <input
+        type="text"
+        formControlName="first_name"
+        autocomplete="given-name"
+        [attr.aria-invalid]="controlError(form.controls.first_name, 'First name') !== null"
+      />
+      @if (controlError(form.controls.first_name, 'First name'); as message) {
+        <p class="field-error">{{ message }}</p>
+      }
+    </label>
+
+    <label class="field">
+      Last name
+      <input
+        type="text"
+        formControlName="last_name"
+        autocomplete="family-name"
+        [attr.aria-invalid]="controlError(form.controls.last_name, 'Last name') !== null"
+      />
+      @if (controlError(form.controls.last_name, 'Last name'); as message) {
+        <p class="field-error">{{ message }}</p>
+      }
+    </label>
+
+    <label class="field">
+      Preferred language
+      <select formControlName="language">
+        @for (lang of languages; track lang.code) {
+          <option [value]="lang.code">{{ lang.label }}</option>
+        }
+      </select>
+      @if (controlError(form.controls.language, 'Language'); as message) {
+        <p class="field-error">{{ message }}</p>
+      }
+    </label>
+
+    @if (formError(); as message) {
+      <p class="form-error" role="alert">{{ message }}</p>
+    } @else if (saved() && form.pristine) {
+      <p class="form-success" role="status">Profile saved.</p>
+    }
+
+    <div class="form-actions">
+      <button type="submit" class="primary" [disabled]="saving() || form.pristine">
+        {{ saving() ? 'Saving...' : 'Save changes' }}
+      </button>
+      <button
+        type="button"
+        class="secondary"
+        (click)="resetForm()"
+        [disabled]="saving() || form.pristine"
+      >
+        Discard
+      </button>
+    </div>
+  </form>
+</section>

@@ -32,7 +32,7 @@
       @for (comment of comments(); track comment.id) {
         <li class="comment">
           <p class="comment-meta">
-            <span class="comment-author">{{ comment.username }}</span>
+            <a class="comment-author" [routerLink]="['/users', comment.username]">{{ comment.username }}</a>
             <span>{{ formatDate(comment.created_at) }}</span>
             @if (comment.updated_at !== comment.created_at) {
               <span>(edited)</span>

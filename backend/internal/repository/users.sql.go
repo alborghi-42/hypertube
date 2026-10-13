@@ -114,3 +114,88 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 	)
 	return i, err
 }
+
+const listUsers = `-- name: ListUsers :many
+SELECT id, username, avatar_url FROM users ORDER BY username
+`
+
+type ListUsersRow struct {
+	ID        pgtype.UUID
+	Username  string
+	AvatarUrl *string
+}
+
+func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
+	rows, err := q.db.Query(ctx, listUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListUsersRow
+	for rows.Next() {
+		var i ListUsersRow
+		if err := rows.Scan(&i.ID, &i.Username, &i.AvatarUrl); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateUserAvatar = `-- name: UpdateUserAvatar :exec
+UPDATE users SET avatar_url = $2, updated_at = now() WHERE id = $1
+`
+
+type UpdateUserAvatarParams struct {
+	ID        pgtype.UUID
+	AvatarUrl *string
+}
+
+func (q *Queries) UpdateUserAvatar(ctx context.Context, arg UpdateUserAvatarParams) error {
+	_, err := q.db.Exec(ctx, updateUserAvatar, arg.ID, arg.AvatarUrl)
+	return err
+}
+
+const updateUserProfile = `-- name: UpdateUserProfile :one
+UPDATE users
+SET username = $2, email = $3, first_name = $4, last_name = $5, language = $6, updated_at = now()
+WHERE id = $1
+RETURNING id, username, email, first_name, last_name, password_hash, avatar_url, language, created_at, updated_at
+`
+
+type UpdateUserProfileParams struct {
+	ID        pgtype.UUID
+	Username  string
+	Email     string
+	FirstName string
+	LastName  string
+	Language  string
+}
+
+func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUserProfile,
+		arg.ID,
+		arg.Username,
+		arg.Email,
+		arg.FirstName,
+		arg.LastName,
+		arg.Language,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Email,
+		&i.FirstName,
+		&i.LastName,
+		&i.PasswordHash,
+		&i.AvatarUrl,
+		&i.Language,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}

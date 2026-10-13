@@ -7,6 +7,7 @@ import {
   resource,
   signal,
 } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 import { AuthService } from '../../auth/auth.service';
 import { CommentsApi, MAX_COMMENT_LENGTH, type MediaComment } from '../comments-api';
@@ -25,6 +26,7 @@ function isValidComment(text: string): boolean {
 /** Comment thread of one media item. Only the author sees edit/delete on a comment. */
 @Component({
   selector: 'app-media-comments',
+  imports: [RouterLink],
   templateUrl: './media-comments.html',
   styleUrl: './media-comments.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

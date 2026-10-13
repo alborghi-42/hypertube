@@ -82,6 +82,7 @@ func main() {
 		stream := router.Group("/stream", sessions.Require())
 
 		auth.NewHandler(pool, sessions, log).RegisterRoutes(api, authed)
+		auth.NewProfileHandler(pool, cfg.DataDir, log).RegisterRoutes(api, authed)
 		auth.NewOAuth(pool, sessions, cookies, cfg.BasePath, cfg.OAuth, log).RegisterRoutes(api)
 		mailer := mail.New(mail.Config{Host: cfg.SMTPHost, Port: cfg.SMTPPort, User: cfg.SMTPUser, Password: cfg.SMTPPassword, From: cfg.SMTPFrom}, log)
 		auth.NewResetHandler(pool, sessions, mailer, cfg.OAuth.PublicURL, cfg.BasePath, log).RegisterRoutes(api)

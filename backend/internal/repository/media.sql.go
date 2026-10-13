@@ -84,6 +84,30 @@ func (q *Queries) CreateMedia(ctx context.Context, arg CreateMediaParams) (Mediu
 	return i, err
 }
 
+const deleteMediaUnlessOthersCommented = `-- name: DeleteMediaUnlessOthersCommented :execrows
+DELETE FROM media m
+WHERE m.media_id = $1
+  AND NOT EXISTS (
+    SELECT 1 FROM media_comments c
+    WHERE c.media_id = m.media_id AND c.user_id <> $2
+  )
+`
+
+type DeleteMediaUnlessOthersCommentedParams struct {
+	MediaID pgtype.UUID
+	UserID  pgtype.UUID
+}
+
+// Public API DELETE /movies/:id: the row (comments and watch history cascade)
+// goes only if no other user has commented on it.
+func (q *Queries) DeleteMediaUnlessOthersCommented(ctx context.Context, arg DeleteMediaUnlessOthersCommentedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteMediaUnlessOthersCommented, arg.MediaID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getMediaByID = `-- name: GetMediaByID :one
 SELECT media_id, external_id, provider, title, description, creator, date, thumbnail_url, duration_seconds, download_status, local_path, public_url, file_size, mime_type, imdb_rating, actors, created_at, updated_at, last_watched_at FROM media WHERE media_id = $1
 `

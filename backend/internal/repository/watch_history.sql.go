@@ -11,6 +11,48 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const listWatchHistory = `-- name: ListWatchHistory :many
+SELECT w.media_id, m.title, w.watched_at
+FROM watch_history w
+JOIN media m ON m.media_id = w.media_id
+WHERE w.user_id = $1
+ORDER BY w.watched_at DESC, w.media_id
+LIMIT $3 OFFSET $2
+`
+
+type ListWatchHistoryParams struct {
+	UserID    pgtype.UUID
+	RowOffset int32
+	RowLimit  int32
+}
+
+type ListWatchHistoryRow struct {
+	MediaID   pgtype.UUID
+	Title     string
+	WatchedAt pgtype.Timestamptz
+}
+
+// The user's watch history, most recent first.
+func (q *Queries) ListWatchHistory(ctx context.Context, arg ListWatchHistoryParams) ([]ListWatchHistoryRow, error) {
+	rows, err := q.db.Query(ctx, listWatchHistory, arg.UserID, arg.RowOffset, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListWatchHistoryRow
+	for rows.Next() {
+		var i ListWatchHistoryRow
+		if err := rows.Scan(&i.MediaID, &i.Title, &i.WatchedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listWatchedMediaIDs = `-- name: ListWatchedMediaIDs :many
 SELECT media_id FROM watch_history
 WHERE user_id = $1 AND media_id = ANY($2::uuid[])
@@ -56,4 +98,21 @@ type MarkWatchedParams struct {
 func (q *Queries) MarkWatched(ctx context.Context, arg MarkWatchedParams) error {
 	_, err := q.db.Exec(ctx, markWatched, arg.UserID, arg.MediaID)
 	return err
+}
+
+const unmarkWatched = `-- name: UnmarkWatched :execrows
+DELETE FROM watch_history WHERE user_id = $1 AND media_id = $2
+`
+
+type UnmarkWatchedParams struct {
+	UserID  pgtype.UUID
+	MediaID pgtype.UUID
+}
+
+func (q *Queries) UnmarkWatched(ctx context.Context, arg UnmarkWatchedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, unmarkWatched, arg.UserID, arg.MediaID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

@@ -111,12 +111,78 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ValidationError" }
+  /users/{id}/watched:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [users]
+      summary: Your watch history, most recent first
+      description: Only the token owner's own history; any other user's id answers 403.
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, maximum: 1000, default: 1 } }
+        - { name: rows, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        "200":
+          description: Watched movies
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/WatchedItem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /movies:
+    post:
+      tags: [movies]
+      summary: Add a provider's movie to the library
+      description: >
+        Looks the movie up with the provider and stores it. The id is derived from
+        provider + external_id, so adding the same movie again is idempotent: 200 with the
+        existing movie instead of 201. Both carry a Location header.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MovieAdd" }
+      responses:
+        "201":
+          description: Movie added
+          headers:
+            Location: { schema: { type: string }, description: URL of the movie }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MovieListItem" }
+        "200":
+          description: Movie was already in the library
+          headers:
+            Location: { schema: { type: string }, description: URL of the movie }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MovieListItem" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: The provider has no such movie
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "502":
+          description: The provider failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
     get:
       tags: [movies]
-      summary: Front page (popular movies), id and name
+      summary: Front page (popular movies), or a search with q
+      description: >
+        Without q, the front page; listed movies are cached so their id resolves on
+        GET /movies/{id}. With q, every provider's results sorted by name; they are not
+        cached, so add one with POST /movies (using its provider and external_id) first.
       security: [{}, { bearer: [] }]
       parameters:
+        - { name: q, in: query, schema: { type: string }, description: Search query }
         - { name: page, in: query, schema: { type: integer, minimum: 1, maximum: 1000, default: 1 } }
         - { name: rows, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 }, description: Rows per provider }
       responses:
@@ -147,6 +213,46 @@ paths:
               schema: { $ref: "#/components/schemas/Movie" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [movies]
+      summary: Delete a movie and its downloaded files
+      description: >
+        Movies are shared, so deletion is refused (409) while the movie is downloading,
+        streaming or converting, and when a user other than the caller has commented on it.
+        Otherwise the downloaded files are removed and the row is deleted together with its
+        comments (the caller's own) and every user's watch-history entry for it. Cached
+        subtitles are kept. A front-page movie reappears (without files) when listed again.
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: In use, or commented by other users
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /movies/{id}/watched:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    post:
+      tags: [movies]
+      summary: Mark the movie as watched by you
+      description: Idempotent; an already watched movie gets its watched_at refreshed.
+      responses:
+        "204": { description: Marked }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [movies]
+      summary: Remove the movie from your watch history
+      responses:
+        "204": { description: Unmarked }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: Unknown movie, or not in your watch history
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
   /movies/{id}/comments:
     parameters:
       - $ref: "#/components/parameters/Id"
@@ -429,6 +535,20 @@ components:
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
+        provider: { type: string, example: archive.org }
+        external_id: { type: string, description: The provider's identifier }
+    MovieAdd:
+      type: object
+      required: [provider, external_id]
+      properties:
+        provider: { type: string, description: A registered provider id }
+        external_id: { type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$' }
+    WatchedItem:
+      type: object
+      properties:
+        movie_id: { type: string, format: uuid }
+        name: { type: string }
+        watched_at: { type: string, format: date-time }
     Movie:
       type: object
       properties:

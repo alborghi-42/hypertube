@@ -11,6 +11,11 @@
 #
 # It creates a throwaway API client for alice and for bob (deleted at the end),
 # posts comments and cleans up after itself. Set VERBOSE=1 to print bodies.
+#
+# The library steps (42-27) add a movie found with GET /movies?q=$DEMO_SEARCH
+# that is not in the library yet, and delete only that movie (never played,
+# so it has no download). If every result is already in the library, the
+# add/delete steps are skipped. Watch-history steps restore alice's history.
 set -euo pipefail
 # shellcheck source=scripts/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -22,6 +27,8 @@ VERBOSE=${VERBOSE:-0}
 # call <expected-status> <description> <curl args...>: runs curl against
 # $API_V1 (the last argument is the path), prints the result and asserts the
 # status. The response body is left in $KIT_TMP/body for jq.
+LAST_STATUS=""
+
 call() {
   local want=$1 desc=$2 got method=GET path
   shift 2
@@ -35,6 +42,7 @@ call() {
   STEP=$((STEP + 1))
   got=$(curl -s -o "$KIT_TMP/body" -D "$KIT_TMP/headers" -w '%{http_code}' "${args[@]}" "$API_V1$path") \
     || die "cannot reach $API_V1$path"
+  LAST_STATUS=$got
   if [[ $got == "$want" ]]; then
     printf '%s%2d. PASS%s %-6s %-48s -> %s  %s\n' "$c_green" "$STEP" "$c_off" "$method" "$path" "$got" "$desc"
   else
@@ -73,7 +81,18 @@ BOB_CLIENT=$CLIENT_ID
 get_token "$BOB_CLIENT" "$CLIENT_SECRET"
 BOB_AUTH="Authorization: Bearer $TOKEN"
 
+DEMO_SEARCH=${DEMO_SEARCH:-night}
+FRESH_ID="" # a movie this run added (201), deleted at the end
+
+# exists <movie id>: 0 if GET /movies/:id answers 200 (not a counted step).
+exists() {
+  [[ $(curl -s -o /dev/null -w '%{http_code}' -H "$AUTH" "$API_V1/movies/$1") == 200 ]]
+}
+
 cleanup_clients() {
+  if [[ -n $FRESH_ID ]]; then
+    curl -s -o /dev/null -X DELETE -H "$AUTH" "$API_V1/movies/$FRESH_ID" || true
+  fi
   session_req "$ALICE_JAR" DELETE "/api/auth/clients/$ALICE_CLIENT" || true
   session_req "$BOB_JAR" DELETE "/api/auth/clients/$BOB_CLIENT" || true
 }
@@ -111,6 +130,8 @@ call 200 "front page without a token" "/movies?page=1&rows=5"
 check "list of {id, name}" 'type == "array" and length > 0 and all(.[]; has("id") and has("name"))'
 MOVIE_ID=$(jq -r '.[0].id // empty' "$KIT_TMP/body")
 MOVIE_NAME=$(jq -r '.[0].name // empty' "$KIT_TMP/body")
+MOVIE_PROVIDER=$(jq -r '.[0].provider // empty' "$KIT_TMP/body")
+MOVIE_EXTERNAL=$(jq -r '.[0].external_id // empty' "$KIT_TMP/body")
 [[ -n $MOVIE_ID ]] || { cleanup_clients; die "front page is empty: are archive.org / publicdomaintorrents reachable?"; }
 call 200 "movie details: $MOVIE_NAME" -H "$AUTH" "/movies/$MOVIE_ID"
 check "name, id, imdb_rating, production_year, length, subtitles, comments_count" \
@@ -144,6 +165,84 @@ call 204 "DELETE own comment" -X DELETE -H "$AUTH" "/comments/$C1"
 call 404 "DELETE it again" -X DELETE -H "$AUTH" "/comments/$C1"
 call 204 "cleanup: DELETE own second comment" -X DELETE -H "$AUTH" "/comments/$C2"
 call 204 "cleanup: bob deletes his comment" -X DELETE -H "$BOB_AUTH" "/comments/$CB"
+
+echo
+echo "== Library: search, add, delete (bonus)"
+call 200 "search: q=$DEMO_SEARCH, no token" "/movies?q=$DEMO_SEARCH&rows=20"
+check "results carry provider + external_id" 'type == "array" and all(.[]; has("id") and has("provider") and has("external_id"))'
+cp "$KIT_TMP/body" "$KIT_TMP/search"
+FRESH_PROVIDER="" FRESH_EXTERNAL=""
+while IFS=$'\t' read -r id prov ext; do
+  if [[ -n $id ]] && ! exists "$id"; then FRESH_PROVIDER=$prov FRESH_EXTERNAL=$ext; break; fi
+done < <(jq -r '.[] | [.id, .provider, .external_id] | @tsv' "$KIT_TMP/search")
+call 400 "add: unknown provider" -H "$AUTH" "$CT" -d '{"provider":"nope","external_id":"x"}' /movies
+check "field error on provider" '.fields.provider != null'
+call 400 "add: missing external_id" -H "$AUTH" "$CT" -d "$(jq -nc --arg p "$MOVIE_PROVIDER" '{provider:$p}')" /movies
+call 400 "add: external_id with a path" -H "$AUTH" "$CT" \
+  -d "$(jq -nc --arg p "$MOVIE_PROVIDER" '{provider:$p, external_id:"../etc"}')" /movies
+call 404 "add: no such item at archive.org" -H "$AUTH" "$CT" \
+  -d '{"provider":"archive.org","external_id":"api-demo-no-such-item-0000"}' /movies
+call 200 "add: front-page movie is already in the library" -H "$AUTH" "$CT" \
+  -d "$(jq -nc --arg p "$MOVIE_PROVIDER" --arg e "$MOVIE_EXTERNAL" '{provider:$p, external_id:$e}')" /movies
+check "same id as the front page" ".id == \"$MOVIE_ID\""
+call 401 "add without a token" "$CT" -d '{"provider":"archive.org","external_id":"x"}' /movies
+call 404 "DELETE an unknown movie" -X DELETE -H "$AUTH" /movies/00000000-0000-0000-0000-000000000000
+if [[ -n $FRESH_EXTERNAL ]]; then
+  call 201 "add: $FRESH_PROVIDER/$FRESH_EXTERNAL" -H "$AUTH" "$CT" \
+    -d "$(jq -nc --arg p "$FRESH_PROVIDER" --arg e "$FRESH_EXTERNAL" '{provider:$p, external_id:$e}')" /movies
+  if [[ $LAST_STATUS == 201 ]]; then FRESH_ID=$(jq -r .id "$KIT_TMP/body"); fi
+fi
+if [[ -n $FRESH_ID ]]; then
+  STEP=$((STEP + 1))
+  if grep -qi "^location: .*/api/v1/movies/$FRESH_ID" "$KIT_TMP/headers"; then
+    printf '%s%2d. PASS%s        Location: /api/v1/movies/%s\n' "$c_green" "$STEP" "$c_off" "$FRESH_ID"
+  else
+    printf '%s%2d. FAIL%s        Location header missing\n' "$c_red" "$STEP" "$c_off"
+    FAILS=$((FAILS + 1))
+  fi
+  call 200 "add it again: idempotent" -H "$AUTH" "$CT" \
+    -d "$(jq -nc --arg p "$FRESH_PROVIDER" --arg e "$FRESH_EXTERNAL" '{provider:$p, external_id:$e}')" /movies
+  call 200 "it resolves now" -H "$AUTH" "/movies/$FRESH_ID"
+elif [[ -z $FRESH_EXTERNAL ]]; then
+  echo "      (every q=$DEMO_SEARCH result is already in the library: add/delete steps skipped)"
+fi
+
+echo
+echo "== Watch history (bonus)"
+W_ID=${FRESH_ID:-$MOVIE_ID}
+WAS_WATCHED=0
+call 200 "own watch history" -H "$AUTH" "/users/$ALICE_ID/watched?rows=100"
+check "items have movie_id, name, watched_at" 'type == "array" and all(.[]; has("movie_id") and has("name") and has("watched_at"))'
+if jq -e --arg m "$W_ID" 'any(.[]; .movie_id == $m)' "$KIT_TMP/body" >/dev/null; then WAS_WATCHED=1; fi
+call 403 "bob's watch history as alice" -H "$AUTH" "/users/$BOB_ID/watched"
+call 400 "invalid rows parameter" -H "$AUTH" "/users/$ALICE_ID/watched?rows=0"
+call 204 "mark as watched" -X POST -H "$AUTH" "/movies/$W_ID/watched"
+call 204 "mark again: idempotent" -X POST -H "$AUTH" "/movies/$W_ID/watched"
+call 404 "mark an unknown movie" -X POST -H "$AUTH" /movies/00000000-0000-0000-0000-000000000000/watched
+call 200 "history page 1, 1 row" -H "$AUTH" "/users/$ALICE_ID/watched?page=1&rows=1"
+check "most recent first: the movie just marked" ".[0].movie_id == \"$W_ID\""
+call 204 "unmark" -X DELETE -H "$AUTH" "/movies/$W_ID/watched"
+call 404 "unmark again: not in history" -X DELETE -H "$AUTH" "/movies/$W_ID/watched"
+if ((WAS_WATCHED)); then
+  call 204 "restore: alice had watched it before" -X POST -H "$AUTH" "/movies/$W_ID/watched"
+fi
+
+if [[ -n $FRESH_ID ]]; then
+  echo
+  echo "== Library: delete policy (bonus)"
+  call 201 "bob comments the added movie" -H "$BOB_AUTH" "$CT" -d '{"comment":"api-demo: keep it"}' "/movies/$FRESH_ID/comments"
+  CF=$(jq -r .id "$KIT_TMP/body")
+  call 409 "DELETE a movie someone else commented" -X DELETE -H "$AUTH" "/movies/$FRESH_ID"
+  call 204 "bob deletes his comment" -X DELETE -H "$BOB_AUTH" "/comments/$CF"
+  call 201 "alice comments it (her own comments cascade)" -H "$AUTH" "$CT" -d '{"comment":"api-demo: mine"}' "/movies/$FRESH_ID/comments"
+  CA=$(jq -r .id "$KIT_TMP/body")
+  call 204 "alice marks it watched (cascades too)" -X POST -H "$AUTH" "/movies/$FRESH_ID/watched"
+  call 204 "DELETE the movie this run added" -X DELETE -H "$AUTH" "/movies/$FRESH_ID"
+  call 404 "it is gone" -H "$AUTH" "/movies/$FRESH_ID"
+  call 404 "its comment went with it" -H "$AUTH" "/comments/$CA"
+  call 404 "DELETE it again" -X DELETE -H "$AUTH" "/movies/$FRESH_ID"
+  FRESH_ID=""
+fi
 
 echo
 echo "== Everything else is refused"

@@ -38,14 +38,15 @@ type API struct {
 	q         *repository.Queries
 	profiles  *auth.ProfileHandler
 	store     *media.Store
+	engine    *media.Engine
 	providers media.Registry
 	subs      *media.Subtitles
 	basePath  string // BASE_PATH, for Location headers
 	log       *slog.Logger
 }
 
-func New(db repository.DBTX, basePath string, profiles *auth.ProfileHandler, store *media.Store, providers media.Registry, subs *media.Subtitles, log *slog.Logger) *API {
-	return &API{q: repository.New(db), profiles: profiles, store: store, providers: providers, subs: subs, basePath: basePath, log: log}
+func New(db repository.DBTX, basePath string, profiles *auth.ProfileHandler, store *media.Store, engine *media.Engine, providers media.Registry, subs *media.Subtitles, log *slog.Logger) *API {
+	return &API{q: repository.New(db), profiles: profiles, store: store, engine: engine, providers: providers, subs: subs, basePath: basePath, log: log}
 }
 
 // RegisterRoutes mounts the bearer-token API on router (outside the
@@ -66,8 +67,13 @@ func (a *API) RegisterRoutes(router *gin.Engine, authed *gin.RouterGroup) {
 	bearer.GET("/users", a.listUsers)
 	bearer.GET("/users/:id", a.getUser)
 	bearer.PATCH("/users/:id", a.patchUser)
+	bearer.GET("/users/:id/watched", a.listWatched)
 
+	bearer.POST("/movies", a.addMovie)
 	bearer.GET("/movies/:id", a.getMovie)
+	bearer.DELETE("/movies/:id", a.deleteMovie)
+	bearer.POST("/movies/:id/watched", a.markWatched)
+	bearer.DELETE("/movies/:id/watched", a.unmarkWatched)
 	bearer.GET("/movies/:id/comments", a.listMovieComments)
 	bearer.POST("/movies/:id/comments", a.postMovieComment)
 

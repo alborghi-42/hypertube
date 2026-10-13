@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -31,10 +32,14 @@ func intQuery(c *gin.Context, key string, def, min, max int) (int, bool) {
 type movieListItem struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+	// What POST /movies takes to add the movie.
+	Provider   string `json:"provider"`
+	ExternalID string `json:"external_id"`
 }
 
-// GET /api/v1/movies?page=&rows= — the front page (popular movies). Listed
-// movies are cached so their id resolves on GET /movies/:id.
+// GET /api/v1/movies?page=&rows=[&q=] — the front page (popular movies), or
+// a search with q. Front-page movies are cached so their id resolves on
+// GET /movies/:id.
 func (a *API) listMovies(c *gin.Context) {
 	page, ok := intQuery(c, "page", 1, 1, 1000)
 	if !ok {
@@ -42,6 +47,10 @@ func (a *API) listMovies(c *gin.Context) {
 	}
 	rows, ok := intQuery(c, "rows", 20, 1, maxRows)
 	if !ok {
+		return
+	}
+	if q := strings.TrimSpace(c.Query("q")); q != "" {
+		a.searchMovies(c, q, page, rows)
 		return
 	}
 	list, err := media.FrontPage(c.Request.Context(), a.providers, page, rows, a.log)
@@ -56,7 +65,7 @@ func (a *API) listMovies(c *gin.Context) {
 		if err := a.store.EnsureMedia(ctx, &list[i]); err != nil {
 			a.log.Warn("cache listed movie failed", "media_id", list[i].ID, "error", err)
 		}
-		out = append(out, movieListItem{ID: list[i].ID, Name: list[i].Title})
+		out = append(out, listItem(&list[i]))
 	}
 	c.JSON(http.StatusOK, out)
 }

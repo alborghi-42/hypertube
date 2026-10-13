@@ -94,6 +94,10 @@ func (a *ArchiveOrg) FetchByID(ctx context.Context, id string) (*Media, error) {
 	}
 
 	md := result.Metadata
+	// archive.org answers 200 {} for an unknown identifier.
+	if md.Identifier == "" && md.Title == "" && len(result.Files) == 0 {
+		return nil, nil
+	}
 	date := md.Date
 	if date == "" {
 		date = md.PublicDate

@@ -155,32 +155,43 @@ func (e *Engine) expire(ctx context.Context, r repository.Medium, cutoff pgtype.
 		return false
 	}
 
-	ih, ok := infohashDir(m.LocalPath)
-	if !ok {
+	dir, removed, err := e.removeFiles(m)
+	switch {
+	case err != nil:
+		e.log.Warn("media retention: remove files failed", "media_id", m.ID, "dir", dir, "error", err)
+	case !removed:
 		// Nothing on disk to remove (e.g. failed rows already cleaned).
 		e.log.Info("media retention: reset media", "media_id", m.ID, "title", m.Title, "status", m.DownloadStatus)
-		return true
+	default:
+		e.log.Info("media retention: deleted unwatched media",
+			"media_id", m.ID, "title", m.Title, "status", m.DownloadStatus,
+			"dir", dir, "size", m.FileSize, "last_watched_at", r.LastWatchedAt.Time)
 	}
-	// A seeding (or not yet dropped) torrent still holds the files open.
+	return true
+}
+
+// removeFiles deletes m's per-infohash download dir (the torrent's files
+// and any cached .mp4), dropping a seeding torrent first since it still
+// holds them open. removed is false when m has nothing on disk.
+func (e *Engine) removeFiles(m *Media) (dir string, removed bool, err error) {
+	ih, ok := infohashDir(m.LocalPath)
+	if !ok {
+		return "", false, nil
+	}
 	var h metainfo.Hash
 	if err := h.FromHexString(ih); err == nil {
 		if t, ok := e.tc.cl.Torrent(h); ok && e.Job(m.ID) == nil {
 			t.Drop()
 		}
 	}
-	dir, ok := e.AbsPath(ih)
+	dir, ok = e.AbsPath(ih)
 	if !ok {
-		return true
+		return "", false, nil
 	}
-	// The per-infohash dir holds the torrent file and any cached .mp4.
 	if err := os.RemoveAll(dir); err != nil {
-		e.log.Warn("media retention: remove files failed", "media_id", m.ID, "dir", dir, "error", err)
-		return true
+		return dir, false, err
 	}
-	e.log.Info("media retention: deleted unwatched media",
-		"media_id", m.ID, "title", m.Title, "status", m.DownloadStatus,
-		"dir", dir, "size", m.FileSize, "last_watched_at", r.LastWatchedAt.Time)
-	return true
+	return dir, true, nil
 }
 
 // infohashDir returns the first segment of a stored local_path

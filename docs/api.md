@@ -150,7 +150,60 @@ curl -s -i -H "$AUTH" -H 'Content-Type: application/json' -d '{"comment":""}' $A
 # 400 {"error":"Validation failed","fields":{"comment":"Comment cannot be empty"}}
 ```
 
-### 5. Everything else is refused
+### 5. Library and watch history (bonus, 42-27)
+
+```sh
+# Search every provider (no token needed, like the front page). Results are not cached:
+# their id 404s on /movies/:id until the movie is added.
+curl -s "$API/movies?q=nosferatu&rows=5"
+# 200 [{"id":"e1d2...","name":"Nosferatu","provider":"archive.org","external_id":"nosferatu_1922"}, ...]
+
+# Add a movie from a provider: 201 when new, 200 when it was already there (same deterministic id).
+curl -s -i -H "$AUTH" -H 'Content-Type: application/json' \
+  -d '{"provider":"archive.org","external_id":"nosferatu_1922"}' $API/movies
+# 201  Location: /api/v1/movies/e1d2...
+# {"id":"e1d2...","name":"Nosferatu","provider":"archive.org","external_id":"nosferatu_1922"}
+curl -s -i -H "$AUTH" -H 'Content-Type: application/json' \
+  -d '{"provider":"nope","external_id":"x"}' $API/movies
+# 400 {"error":"Validation failed","fields":{"provider":"provider must be one of: archive.org, publicdomaintorrents"}}
+curl -s -i -H "$AUTH" -H 'Content-Type: application/json' \
+  -d '{"provider":"archive.org","external_id":"no-such-item-xyz"}' $API/movies
+# 404 {"error":"Movie not found at provider"}
+
+# Watch history: mark / unmark for yourself, list your own.
+curl -s -i -X POST -H "$AUTH" $API/movies/e1d2.../watched     # 204 (again: 204, watched_at refreshed)
+curl -s -H "$AUTH" "$API/users/0b9e.../watched?page=1&rows=20"
+# 200 [{"movie_id":"e1d2...","name":"Nosferatu","watched_at":"2026-10-13T10:00:00Z"}]
+curl -s -i -H "$AUTH" $API/users/5d21.../watched              # 403: only your own history
+curl -s -i -X DELETE -H "$AUTH" $API/movies/e1d2.../watched   # 204
+curl -s -i -X DELETE -H "$AUTH" $API/movies/e1d2.../watched   # 404 not in your history
+
+# Delete a movie (files + row).
+curl -s -i -X DELETE -H "$AUTH" $API/movies/e1d2...
+# 204, then 404 on a second call
+# 409 {"error":"Movie is being downloaded or watched"}
+# 409 {"error":"Other users have commented on this movie"}
+```
+
+Search, add and the list items carry `provider` + `external_id`, which is exactly what
+`POST /movies` takes. Watch history is private (like the email): `GET /users/:id/watched` is 403
+for any id but the token owner's, existing or not. Playing a movie in the web app also marks it
+watched.
+
+**Delete policy.** Movies are a shared library, not owned by whoever added them, so
+`DELETE /movies/:id` is guarded rather than owner-only:
+
+- **409** while the movie is in use: an active torrent download, an open stream or an mp4
+  conversion (the same checks the media retention job uses before deleting files);
+- **409** when a user other than the caller has commented on it, so nobody can wipe other
+  people's comments;
+- otherwise the download directory is removed with the retention job's helper (dropping the
+  seeding torrent first), the row is deleted and, through `ON DELETE CASCADE`, so are the
+  caller's comments and every user's watch-history entry for it. Cached subtitles are kept
+  (keyed by the same deterministic id, they stay valid if the movie is added again). A
+  front-page movie reappears, without files, the next time the front page is listed.
+
+### 6. Everything else is refused
 
 ```sh
 curl -s -i $API/users                              # 401 + WWW-Authenticate: Bearer realm="hypertube"

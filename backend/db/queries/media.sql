@@ -43,3 +43,13 @@ WHERE media_id = sqlc.arg(media_id)
 -- Fills the runtime once (from OMDB) without touching download state.
 UPDATE media SET duration_seconds = $2
 WHERE media_id = $1 AND COALESCE(duration_seconds, 0) <= 0;
+
+-- name: DeleteMediaUnlessOthersCommented :execrows
+-- Public API DELETE /movies/:id: the row (comments and watch history cascade)
+-- goes only if no other user has commented on it.
+DELETE FROM media m
+WHERE m.media_id = sqlc.arg(media_id)
+  AND NOT EXISTS (
+    SELECT 1 FROM media_comments c
+    WHERE c.media_id = m.media_id AND c.user_id <> sqlc.arg(user_id)
+  );

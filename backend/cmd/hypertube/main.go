@@ -134,7 +134,7 @@ func main() {
 		go engine.RunRetention(ctx, cfg.MediaRetention) // 42-18: delete unwatched downloads
 		// Public REST API (subject III.4): OAuth2 bearer tokens on /api/v1,
 		// outside the cookie CSRF group; clients are managed on /api/auth/clients.
-		publicapi.New(pool, cfg.BasePath, profiles, store, providers, subs, log).RegisterRoutes(router, authed)
+		publicapi.New(pool, cfg.BasePath, profiles, store, engine, providers, subs, log).RegisterRoutes(router, authed)
 	} else {
 		log.Warn("auth and media routes disabled: they require DATABASE_URL")
 	}

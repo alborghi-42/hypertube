@@ -1,4 +1,5 @@
-import { Component, computed, inject } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
+import { Component, PLATFORM_ID, computed, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 
 import { AuthService } from '../auth/auth.service';
@@ -25,6 +26,13 @@ export class AppHeader {
     const fromName = `${user.first_name.charAt(0)}${user.last_name.charAt(0)}`;
     return (fromName || user.username.slice(0, 2)).toUpperCase();
   });
+
+  constructor() {
+    // Guard-free pages (e.g. /reset-password) never load the session: do it here.
+    if (isPlatformBrowser(inject(PLATFORM_ID))) {
+      void this.auth.loadUser();
+    }
+  }
 
   protected onLanguageChange(event: Event): void {
     this.language.set((event.target as HTMLSelectElement).value);

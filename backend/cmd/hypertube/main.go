@@ -210,6 +210,18 @@ func ssrProxy(cfg config.Config, log *slog.Logger) gin.HandlerFunc {
 		log.Warn("SSR proxy error", "path", r.URL.Path, "error", err)
 		w.WriteHeader(http.StatusBadGateway)
 	}
+	// no-transform keeps Cloudflare from rewriting the HTML (it injects the
+	// Web Analytics beacon, which browsers' tracking protection then blocks
+	// and logs as console errors).
+	proxy.ModifyResponse = func(resp *http.Response) error {
+		if strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
+			cc := resp.Header.Get("Cache-Control")
+			if !strings.Contains(cc, "no-transform") {
+				resp.Header.Set("Cache-Control", strings.TrimLeft(cc+", no-transform", ", "))
+			}
+		}
+		return nil
+	}
 	return func(c *gin.Context) {
 		// The SSR app is built with the base path as its base href and expects it back.
 		c.Request.URL.Path = cfg.BasePath + c.Request.URL.Path

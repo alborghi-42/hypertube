@@ -42,7 +42,8 @@ func NewHandler(store *Store, providers Registry, engine *Engine, log *slog.Logg
 	return &Handler{store: store, providers: providers, engine: engine, tx: tx, log: log}
 }
 
-// RegisterRoutes mounts the public movie GETs on api (the /api group), the
+// RegisterRoutes mounts the public movie GETs on api (the /api group, with
+// Sessions.Optional so lists can flag the user's watched films), the
 // rest of the JSON API on authed (/api behind a session check) and the
 // video streams on stream (the /stream group, also session-only).
 func (h *Handler) RegisterRoutes(api, authed, stream *gin.RouterGroup) {
@@ -152,7 +153,7 @@ func (h *Handler) fetchMedia(c *gin.Context) {
 	if !ok {
 		return
 	}
-	c.JSON(http.StatusOK, mergeResults(lists, false))
+	c.JSON(http.StatusOK, h.withWatched(c, mergeResults(lists, false)))
 }
 
 // GET /api/media/search?q=&page=&rows=&provider= — results from every
@@ -175,7 +176,31 @@ func (h *Handler) searchMedia(c *gin.Context) {
 	if !ok {
 		return
 	}
-	c.JSON(http.StatusOK, mergeResults(lists, true))
+	c.JSON(http.StatusOK, h.withWatched(c, mergeResults(lists, true)))
+}
+
+// withWatched flags the results the session user has played. Anonymous
+// requests (or a failed lookup) leave every item unwatched.
+func (h *Handler) withWatched(c *gin.Context, list []Media) []Media {
+	u := auth.CurrentUser(c)
+	if u == nil || !u.ID.Valid || len(list) == 0 {
+		return list
+	}
+	ids := make([]string, len(list))
+	for i, m := range list {
+		ids[i] = m.ID
+	}
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
+	watched, err := h.store.WatchedSet(ctx, u.ID, ids)
+	if err != nil {
+		h.log.Error("watch history lookup failed", "error", err)
+		return list
+	}
+	for i := range list {
+		list[i].Watched = watched[list[i].ID]
+	}
+	return list
 }
 
 // GET /api/media/details?external_id=&provider= — cached metadata, fetched
@@ -268,6 +293,14 @@ func (h *Handler) playMedia(c *gin.Context) {
 		return
 	}
 	h.engine.TouchWatched(internalID)
+
+	// The media row now exists: record the play for the session user
+	// (42-13). Best-effort, playback does not depend on it.
+	if u := auth.CurrentUser(c); u != nil && u.ID.Valid {
+		if err := h.store.MarkWatched(ctx, u.ID, internalID); err != nil {
+			h.log.Error("mark watched failed", "media_id", internalID, "error", err)
+		}
+	}
 
 	// Only a completed download whose file is still on disk is "available";
 	// "failed" or a vanished file start a fresh download below.

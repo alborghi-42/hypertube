@@ -38,6 +38,9 @@ browser over the results loaded so far: providers page independently and ratings
 OMDb, so the merged catalogue cannot be sorted server-side. Infinite scroll keeps loading pages
 while the filtered list is short, and new matches slot into the chosen order.
 
+Playing a film (`/api/media/play`) records it in `watch_history`; for a logged-in user the list
+and search results carry `watched: true` on those items and the cards show a "Watched" badge.
+
 Frontend: `/` is the browse feed, `/watch/:id` opens the player for an item.
 
 ## Development

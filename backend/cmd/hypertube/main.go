@@ -110,7 +110,9 @@ func main() {
 			media.NewArchiveOrg(cfg.OMDBAPIKey, log),
 			media.NewPublicDomainTorrents(cfg.OMDBAPIKey, log),
 		)
-		media.NewHandler(store, providers, engine, log).RegisterRoutes(api, authed, stream)
+		// Public media GETs see the session when there is one (watched flags).
+		mediaAPI := api.Group("", sessions.Optional())
+		media.NewHandler(store, providers, engine, log).RegisterRoutes(mediaAPI, authed, stream)
 		go engine.RunRetention(ctx, cfg.MediaRetention) // 42-18: delete unwatched downloads
 		// Public REST API (subject III.4): OAuth2 bearer tokens on /api/v1,
 		// outside the cookie CSRF group; clients are managed on /api/auth/clients.

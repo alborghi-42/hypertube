@@ -194,7 +194,9 @@
       "rating": "IMDb rating",
       "yearDesc": "Newest first",
       "yearAsc": "Oldest first"
-    }
+    },
+    "watched": "Watched",
+    "videoAriaWatched": "Video titled {{title}} by {{channel}}, already watched"
   },
   "comments": {
     "title": "Comments",

@@ -25,6 +25,8 @@ export interface MediaDoc {
   imdb_rating?: number;
   genres?: string[] | null;
   imdb_id?: string;
+  /** True when the logged-in user has already played this item. */
+  watched?: boolean;
 }
 
 export interface MediaDetails {

@@ -105,7 +105,7 @@ func (a *API) getMovie(c *gin.Context) {
 	if m.ImdbRating > 0 {
 		resp.ImdbRating = &m.ImdbRating
 	}
-	if y, err := strconv.Atoi(m.Year()); err == nil {
+	if y, err := strconv.Atoi(m.Year); err == nil {
 		resp.ProductionYear = &y
 	}
 	if m.DurationSeconds > 0 {

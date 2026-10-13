@@ -36,6 +36,7 @@ interface Video {
   /** IMDb rating, null when unknown. */
   rating: number | null;
   genres: string[];
+  watched: boolean;
   accent: string;
   thumbnailUrl: string;
   detailsUrl: string;
@@ -150,6 +151,7 @@ export class Browse {
           rating:
             typeof doc.imdb_rating === 'number' && doc.imdb_rating > 0 ? doc.imdb_rating : null,
           genres: doc.genres ?? [],
+          watched: doc.watched === true,
           accent: '0.71 0.17 150',
           thumbnailUrl: doc.thumbnailUrl ?? doc.thumbnail_url ?? '',
           detailsUrl: sourceUrl(provider, id),
@@ -418,6 +420,14 @@ export class Browse {
       return;
     }
     this.streamUrlByVideoId.update((byId) => ({ ...byId, [videoId]: url }));
+    // The play call recorded it server-side; reflect that on the card right away.
+    this.allDocs.update((docs) =>
+      docs.map((doc) =>
+        (doc.identifier ?? doc.external_id) === videoId && doc.watched !== true
+          ? { ...doc, watched: true }
+          : doc,
+      ),
+    );
   }
 
   private syncSelectedVideoFromPath(url: string): void {

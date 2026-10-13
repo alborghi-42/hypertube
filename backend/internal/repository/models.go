@@ -88,3 +88,9 @@ type User struct {
 	CreatedAt    pgtype.Timestamptz
 	UpdatedAt    pgtype.Timestamptz
 }
+
+type WatchHistory struct {
+	UserID    pgtype.UUID
+	MediaID   pgtype.UUID
+	WatchedAt pgtype.Timestamptz
+}

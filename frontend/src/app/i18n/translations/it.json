@@ -194,7 +194,9 @@
       "rating": "Voto IMDb",
       "yearDesc": "Più recenti",
       "yearAsc": "Meno recenti"
-    }
+    },
+    "watched": "Visto",
+    "videoAriaWatched": "Video {{title}} di {{channel}}, già visto"
   },
   "comments": {
     "title": "Commenti",

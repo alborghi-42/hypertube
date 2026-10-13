@@ -36,6 +36,9 @@ type Media struct {
 	ImdbID     string   `json:"imdb_id,omitempty"`
 	ImdbRating float64  `json:"imdb_rating"`
 
+	// Watched is set on list/search results for the session user (42-13).
+	Watched bool `json:"watched"`
+
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

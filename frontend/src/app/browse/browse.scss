@@ -206,6 +206,11 @@
   gap: 1.15rem;
 }
 
+.video-card.watched .thumb-image {
+  opacity: 0.55;
+  filter: grayscale(0.6);
+}
+
 .video-card {
   display: flex;
   flex-direction: column;
@@ -267,6 +272,22 @@
     border-top: 1px solid oklch(from var(--ht-text-0) l c h / 0.2);
     border-radius: 0.35rem;
     pointer-events: none;
+  }
+
+  .watched-badge {
+    position: absolute;
+    top: 0.45rem;
+    left: 0.45rem;
+    z-index: 1;
+    font-family: var(--ht-font-mono);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ht-bg-0);
+    background: var(--ht-accent);
+    border-radius: 999px;
+    padding: 0.2rem 0.55rem;
   }
 
   .duration {

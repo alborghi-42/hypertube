@@ -45,9 +45,6 @@ func FrontPage(ctx context.Context, providers Registry, page, rows int, log *slo
 	return nil, ErrAllProvidersFailed
 }
 
-// Year is the production year parsed from the provider date, or "".
-func (m *Media) Year() string { return mediaYear(m.Date) }
-
 // EnsureMedia caches m (as listed by a provider) unless its row already
 // exists, so ids handed out by the API resolve with GetMedia.
 func (s *Store) EnsureMedia(ctx context.Context, m *Media) error {

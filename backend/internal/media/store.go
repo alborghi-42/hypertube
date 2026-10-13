@@ -262,3 +262,34 @@ func (s *Store) DeleteComment(ctx context.Context, commentID, mediaID string, au
 	}
 	return nil
 }
+
+// MarkWatched records (or refreshes) that the user played the media.
+func (s *Store) MarkWatched(ctx context.Context, userID pgtype.UUID, mediaID string) error {
+	mid, err := toUUID(mediaID)
+	if err != nil {
+		return err
+	}
+	return s.q.MarkWatched(ctx, repository.MarkWatchedParams{UserID: userID, MediaID: mid})
+}
+
+// WatchedSet returns which of mediaIDs the user has watched.
+func (s *Store) WatchedSet(ctx context.Context, userID pgtype.UUID, mediaIDs []string) (map[string]bool, error) {
+	ids := make([]pgtype.UUID, 0, len(mediaIDs))
+	for _, id := range mediaIDs {
+		if u, err := toUUID(id); err == nil {
+			ids = append(ids, u)
+		}
+	}
+	if len(ids) == 0 {
+		return map[string]bool{}, nil
+	}
+	rows, err := s.q.ListWatchedMediaIDs(ctx, repository.ListWatchedMediaIDsParams{UserID: userID, MediaIds: ids})
+	if err != nil {
+		return nil, err
+	}
+	set := make(map[string]bool, len(rows))
+	for _, r := range rows {
+		set[fromUUID(r)] = true
+	}
+	return set, nil
+}

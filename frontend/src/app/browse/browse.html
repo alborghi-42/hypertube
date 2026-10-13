@@ -134,9 +134,11 @@
       @for (video of filteredVideos(); track video.id) {
         <article
           class="video-card"
+          [class.watched]="video.watched"
           title="{{ video.title }}"
           [attr.aria-label]="
-            'browse.videoAria' | transloco: { title: video.title, channel: video.channel }
+            (video.watched ? 'browse.videoAriaWatched' : 'browse.videoAria')
+              | transloco: { title: video.title, channel: video.channel }
           "
           role="button"
           tabindex="0"
@@ -151,6 +153,11 @@
               [alt]="video.title"
               loading="lazy"
             />
+            @if (video.watched) {
+              <span class="watched-badge" aria-hidden="true">{{
+                'browse.watched' | transloco
+              }}</span>
+            }
           </div>
           <div class="video-meta" [attr.aria-label]="'browse.videoDetails' | transloco">
             <h2>{{ video.title }}</h2>

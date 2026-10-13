@@ -97,21 +97,23 @@ export class MediaPlayer {
   });
 
   /** The backend answered 202: playback starts but may stall while pieces arrive. */
-  readonly downloading = computed(() => this.stream.value()?.status === 'downloading');
-  readonly transcoded = computed(() => this.stream.value()?.transcoded === true);
+  /** The stream response; undefined while loading or on error (value() would throw). */
+  readonly current = computed(() => (this.stream.hasValue() ? this.stream.value() : undefined));
+  readonly downloading = computed(() => this.current()?.status === 'downloading');
+  readonly transcoded = computed(() => this.current()?.transcoded === true);
 
   /** `?quality=` values offered by the server; "original" alone hides the selector. */
   readonly qualities = computed(() => {
-    const list = this.stream.value()?.qualities ?? [];
+    const list = this.current()?.qualities ?? [];
     return list.length > 0 ? list : [QUALITY_ORIGINAL];
   });
   /** Selected rendition; back to original for every new stream. */
   readonly quality = linkedSignal({
-    source: () => this.stream.value()?.url,
+    source: () => this.current()?.url,
     computation: () => QUALITY_ORIGINAL,
   });
   /** Absolute start (s) of the current server-encoded stream, sent as `?t=`. */
-  readonly startAt = linkedSignal({ source: () => this.stream.value()?.url, computation: () => 0 });
+  readonly startAt = linkedSignal({ source: () => this.current()?.url, computation: () => 0 });
   /** Server-encoded stream (mkv conversion or a downscaled rendition): seek by reloading. */
   readonly serverSeek = computed(() => this.transcoded() || this.quality() !== QUALITY_ORIGINAL);
   /** Set when a server-encoded stream fails (typically 503: all conversion slots busy). */
@@ -119,7 +121,7 @@ export class MediaPlayer {
 
   /** The <video> src: the play url plus `?quality=` / `?t=` for server-encoded streams. */
   readonly src = computed(() => {
-    const base = this.stream.value()?.url;
+    const base = this.current()?.url;
     if (base === undefined) {
       return '';
     }

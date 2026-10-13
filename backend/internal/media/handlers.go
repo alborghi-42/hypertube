@@ -381,8 +381,14 @@ func (h *Handler) playMedia(c *gin.Context) {
 
 	job, err := h.engine.Start(p, m)
 	if err != nil {
+		// Not 502: the 42 portal shows its "offline" page for any 502-504.
+		if errors.Is(err, ErrNoVideo) {
+			h.log.Warn("torrent has no video", "media_id", internalID)
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "This item has no playable video", "code": "no_video", "internal_id": internalID})
+			return
+		}
 		h.log.Error("torrent start failed", "media_id", internalID, "error", err)
-		c.JSON(http.StatusBadGateway, gin.H{"error": "Failed to start download", "internal_id": internalID})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start download", "internal_id": internalID})
 		return
 	}
 
@@ -402,7 +408,7 @@ func (h *Handler) playMedia(c *gin.Context) {
 		resp(http.StatusOK, "ready", "Enough data downloaded to start playback")
 	case <-job.Done():
 		if job.Err() != nil {
-			c.JSON(http.StatusBadGateway, gin.H{"error": "Download failed", "internal_id": internalID})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Download failed", "internal_id": internalID})
 			return
 		}
 		resp(http.StatusOK, "available", "Media downloaded")

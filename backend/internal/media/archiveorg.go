@@ -153,11 +153,16 @@ func (a *ArchiveOrg) Search(ctx context.Context, query string, page, rows int) (
 	return a.search(ctx, "("+strings.Join(words, " AND ")+")", "titleSorter asc", page, rows)
 }
 
+// archiveVideoFormats are archive.org format names of playable or convertible video.
+const archiveVideoFormats = `MPEG4 OR "h.264" OR "h.264 IA" OR "512Kb MPEG4" OR Matroska OR "Ogg Video" OR WebM`
+
 // search runs a raw Lucene query against archive.org's advancedsearch,
 // restricted to torrent-backed films.
 func (a *ArchiveOrg) search(ctx context.Context, lucene, sortBy string, page, rows int) ([]Media, error) {
 	query := lucene
-	searchQuery := fmt.Sprintf("(%s) AND collection:moviesandfilms AND format:(\"Archive BitTorrent\")", lucene)
+	// The video format clause drops items whose torrent holds no video
+	// (removed/dark items still list their metadata and torrent).
+	searchQuery := fmt.Sprintf("(%s) AND collection:moviesandfilms AND format:(\"Archive BitTorrent\") AND format:(%s)", lucene, archiveVideoFormats)
 	q := url.Values{}
 	q.Set("q", searchQuery)
 	for _, f := range []string{"identifier", "title", "date", "publicdate"} {

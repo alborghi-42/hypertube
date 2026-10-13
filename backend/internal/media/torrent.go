@@ -258,7 +258,7 @@ func (e *Engine) start(p Provider, m *Media) (*Job, error) {
 	f := pickVideoFile(t.Files())
 	if f == nil {
 		t.Drop()
-		return nil, errors.New("no playable video file in torrent")
+		return nil, ErrNoVideo
 	}
 	for _, other := range t.Files() {
 		if other != f {
@@ -419,6 +419,9 @@ func (e *Engine) AbsPath(rel string) (string, bool) {
 	}
 	return filepath.Join(e.downloadDir, p), true
 }
+
+// ErrNoVideo: the torrent holds no playable or convertible video file.
+var ErrNoVideo = errors.New("no playable video file in torrent")
 
 // Browser-native containers first; the others need conversion (42-16).
 var (

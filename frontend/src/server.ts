@@ -13,7 +13,17 @@ const browserDistFolder = join(import.meta.dirname, '../browser');
 const basePath = (process.env['BASE_PATH'] || '').replace(/\/+$/, '');
 
 const app = express();
-const angularApp = new AngularNodeAppEngine();
+// Requests come through the Go backend and the 42 portal, which set X-Forwarded-*.
+const angularApp = new AngularNodeAppEngine({
+  trustProxyHeaders: [
+    'x-forwarded-for',
+    'x-forwarded-host',
+    'x-forwarded-port',
+    'x-forwarded-proto',
+    'x-forwarded-server',
+    'x-forwarded-prefix',
+  ],
+});
 
 /**
  * Example Express Rest API endpoints can be defined here.
@@ -45,9 +55,7 @@ app.use(
 app.use((req, res, next) => {
   angularApp
     .handle(req)
-    .then((response) =>
-      response ? writeResponseToNodeResponse(response, res) : next(),
-    )
+    .then((response) => (response ? writeResponseToNodeResponse(response, res) : next()))
     .catch(next);
 });
 

@@ -7,7 +7,7 @@
       <span class="play-icon" aria-hidden="true"></span>
       <span class="play-label">{{ 'player.play' | transloco }}</span>
     </button>
-  } @else if (stream.value(); as s) {
+  } @else if (current(); as s) {
     <video
       #video
       class="player"
@@ -63,7 +63,7 @@
 @if (downloading()) {
   <p class="player-note" aria-live="polite">{{ 'player.downloading' | transloco }}</p>
 }
-@if (stream.value() && subtitles().length === 0) {
+@if (current() && subtitles().length === 0) {
   <p class="player-note" aria-live="polite">
     {{ (subtitlesPending() ? 'player.subtitlesLoading' : 'player.noSubtitles') | transloco }}
   </p>

@@ -30,6 +30,7 @@ type Handler struct {
 	engine    *Engine
 	tx        *Transcoder
 	log       *slog.Logger
+	omdbKey   string
 }
 
 // NewHandler also sets up ffmpeg conversion (42-16) and, unless one is
@@ -39,7 +40,7 @@ func NewHandler(store *Store, providers Registry, engine *Engine, log *slog.Logg
 	if engine.PostProcess == nil {
 		engine.PostProcess = tx.CachePostProcess(engine)
 	}
-	return &Handler{store: store, providers: providers, engine: engine, tx: tx, log: log}
+	return &Handler{store: store, providers: providers, engine: engine, tx: tx, log: log, omdbKey: os.Getenv("OMDB_API_KEY")}
 }
 
 // RegisterRoutes mounts the public movie GETs on api (the /api group, with
@@ -204,7 +205,9 @@ func (h *Handler) withWatched(c *gin.Context, list []Media) []Media {
 }
 
 // GET /api/media/details?external_id=&provider= — cached metadata, fetched
-// from the provider and stored on first access.
+// from the provider and stored on first access, then completed with the
+// OMDB credits (director, writers, production, genres, runtime) used by the
+// movie page. A runtime found on OMDB is persisted as duration_seconds.
 func (h *Handler) getMediaDetails(c *gin.Context) {
 	externalID := c.Query("external_id")
 	if externalID == "" {
@@ -213,35 +216,67 @@ func (h *Handler) getMediaDetails(c *gin.Context) {
 	}
 	name := c.DefaultQuery("provider", defaultProvider)
 	internalID := InternalID(externalID, name)
+	ctx := c.Request.Context()
 
-	if existing, err := h.store.GetMedia(c.Request.Context(), internalID); err == nil {
-		c.JSON(http.StatusOK, existing)
-		return
-	}
-
-	p, _, ok := h.provider(c)
-	if !ok {
-		return
-	}
-	m, err := p.FetchByID(c.Request.Context(), externalID)
+	m, err := h.store.GetMedia(ctx, internalID)
 	if err != nil {
-		h.log.Error("fetch by id failed", "provider", name, "external_id", externalID, "error", err)
-		c.JSON(http.StatusBadGateway, gin.H{"error": "Failed to fetch media from provider"})
-		return
+		p, _, ok := h.provider(c)
+		if !ok {
+			return
+		}
+		fetched, ferr := p.FetchByID(ctx, externalID)
+		if ferr != nil {
+			h.log.Error("fetch by id failed", "provider", name, "external_id", externalID, "error", ferr)
+			c.JSON(http.StatusBadGateway, gin.H{"error": "Failed to fetch media from provider"})
+			return
+		}
+		if fetched == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Media not found"})
+			return
+		}
+		fetched.ID = internalID
+		if m, err = h.store.CreateMedia(ctx, fetched); err != nil {
+			h.log.Error("cache media failed", "media_id", internalID, "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cache media"})
+			return
+		}
 	}
-	if m == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Media not found"})
-		return
-	}
-	m.ID = internalID
 
-	saved, err := h.store.CreateMedia(c.Request.Context(), m)
+	h.enrichDetails(ctx, m)
+	c.JSON(http.StatusOK, m)
+}
+
+// enrichDetails adds the OMDB fields that are not stored on the media row
+// (served from the shared OMDB cache) and persists a missing runtime.
+// Failures are logged and leave m as stored.
+func (h *Handler) enrichDetails(ctx context.Context, m *Media) {
+	hadDuration := m.DurationSeconds > 0
+	info, err := omdbLookup(ctx, h.omdbKey, omdbQuery{Title: m.Title, Year: m.Year})
 	if err != nil {
-		h.log.Error("cache media failed", "media_id", internalID, "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cache media"})
+		h.log.Warn("OMDB details unavailable", "media_id", m.ID, "error", err)
 		return
 	}
-	c.JSON(http.StatusOK, saved)
+	if info == nil && m.Year != "" {
+		// The provider year can be a re-release date; retry on the title.
+		info, _ = omdbLookup(ctx, h.omdbKey, omdbQuery{Title: m.Title})
+	}
+	if info == nil {
+		return
+	}
+	stored := *m
+	applyOMDB(m, info)
+	// The stored rating/actors come from the provider's own match; keep them.
+	if stored.ImdbRating > 0 {
+		m.ImdbRating = stored.ImdbRating
+	}
+	if len(stored.Actors) > 0 {
+		m.Actors = stored.Actors
+	}
+	if !hadDuration && m.DurationSeconds > 0 {
+		if err := h.store.SetDuration(ctx, m.ID, m.DurationSeconds); err != nil {
+			h.log.Error("store duration failed", "media_id", m.ID, "error", err)
+		}
+	}
 }
 
 // GET /api/media/play?external_id=&provider= — makes the media playable.

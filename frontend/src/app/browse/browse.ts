@@ -1,8 +1,7 @@
-import { Location, isPlatformBrowser } from '@angular/common';
+import { isPlatformBrowser } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   PLATFORM_ID,
   afterRenderEffect,
   computed,
@@ -13,15 +12,13 @@ import {
   viewChild,
   type ElementRef,
 } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 
-import { MediaComments } from '../media/comments/media-comments';
 import { LanguageService } from '../shell/language.service';
 import {
   DEFAULT_PROVIDER,
   MediaApi,
-  type MediaDetails,
   type MediaDoc,
   type MediaListParams,
 } from '../media/media-api';
@@ -39,7 +36,6 @@ interface Video {
   watched: boolean;
   accent: string;
   thumbnailUrl: string;
-  detailsUrl: string;
 }
 
 export type SortKey = 'default' | 'name' | 'rating' | 'yearDesc' | 'yearAsc';
@@ -64,32 +60,26 @@ const NO_FILTERS: LibraryFilters = {
 };
 
 const ROWS_PER_PAGE = 24;
-const WATCH_PATH = /^\/watch\/([^/]+)$/;
 
 /**
- * Browse page: infinite-scroll feed of legal media (archive.org), search, and a
- * player modal. Ported from the deprecated Clashboard /hypertube page.
- * Routes: `/` (feed) and `/watch/:id` (feed with the player open).
+ * Browse page: infinite-scroll feed of legal media, search, sort and filters.
+ * Ported from the deprecated Clashboard /hypertube page. Cards link to the
+ * movie page (`/movie/:provider/:externalId`).
  */
 @Component({
   selector: 'app-browse',
-  imports: [MediaComments, TranslocoPipe],
+  imports: [RouterLink, TranslocoPipe],
   templateUrl: './browse.html',
   styleUrl: './browse.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {
-    '(document:keydown.escape)': 'closeVideoModal()',
-  },
 })
 export class Browse {
   private readonly api = inject(MediaApi);
-  private readonly location = inject(Location);
   private readonly language = inject(LanguageService);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
 
   private searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly mediaPageCache = new Map<string, MediaDoc[]>();
-  private readonly mediaDetailsCache = new Map<string, MediaDetails>();
   private readonly preloadingPageKeys = new Set<string>();
   private readonly preloadedThumbnailUrls = new Set<string>();
 
@@ -103,12 +93,6 @@ export class Browse {
   readonly currentPage = signal(1);
   readonly allDocs = signal<MediaDoc[]>([]);
   readonly hasMore = signal(true);
-  readonly selectedVideoId = signal<string | null>(
-    inject(ActivatedRoute).snapshot.paramMap.get('id'),
-  );
-  readonly streamUrlByVideoId = signal<Record<string, string>>({});
-  readonly streamErrorByVideoId = signal<Record<string, boolean>>({});
-
   /** Data is fetched in the browser only: the relative /api URLs have no origin during SSR/prerender. */
   readonly mediaResource = resource({
     params: (): MediaListParams | undefined =>
@@ -154,43 +138,9 @@ export class Browse {
           watched: doc.watched === true,
           accent: '0.71 0.17 150',
           thumbnailUrl: doc.thumbnailUrl ?? doc.thumbnail_url ?? '',
-          detailsUrl: sourceUrl(provider, id),
         };
       }),
   );
-
-  readonly selectedVideo = computed(() => {
-    const id = this.selectedVideoId();
-    return id === null ? null : (this.videos().find((video) => video.id === id) ?? null);
-  });
-
-  readonly selectedVideoStreamUrl = computed(() => {
-    const id = this.selectedVideoId();
-    return id === null ? null : (this.streamUrlByVideoId()[id] ?? null);
-  });
-
-  readonly selectedVideoHasStreamError = computed(() => {
-    const id = this.selectedVideoId();
-    return id === null ? false : (this.streamErrorByVideoId()[id] ?? false);
-  });
-
-  readonly selectedVideoDetailsResource = resource({
-    params: () => {
-      const video = this.selectedVideo();
-      return video ? { id: video.id, provider: video.provider } : undefined;
-    },
-    loader: async ({ params, abortSignal }) => {
-      const cached = this.mediaDetailsCache.get(params.id);
-      if (cached !== undefined) {
-        return cached;
-      }
-      const details = await this.api.details(params.id, params.provider, abortSignal);
-      this.mediaDetailsCache.set(params.id, details);
-      return details;
-    },
-  });
-
-  readonly selectedVideoDetails = computed(() => this.selectedVideoDetailsResource.value());
 
   /** Genres present in the loaded results, for the genre filter. */
   readonly genres = computed(() =>
@@ -232,18 +182,6 @@ export class Browse {
   });
 
   constructor() {
-    const initialId = this.selectedVideoId();
-    if (this.isBrowser && initialId !== null) {
-      void this.loadVideoStream(initialId);
-    }
-
-    // Back/forward between `/` and `/watch/:id` (URL changes made with Location.go
-    // are invisible to the router, so sync the modal from the path ourselves).
-    const popstate = this.location.subscribe(({ url }) =>
-      this.syncSelectedVideoFromPath(url ?? ''),
-    );
-    inject(DestroyRef).onDestroy(() => popstate.unsubscribe());
-
     // Accumulate docs as each page loads.
     effect(() => {
       const newDocs = this.mediaResource.value();
@@ -326,26 +264,6 @@ export class Browse {
     this.filters.set(NO_FILTERS);
   }
 
-  openVideoModal(videoId: string): void {
-    this.selectedVideoId.set(videoId);
-    this.location.go(`/watch/${encodeURIComponent(videoId)}`);
-    void this.loadVideoStream(videoId);
-  }
-
-  closeVideoModal(): void {
-    if (this.selectedVideoId() === null) {
-      return;
-    }
-    this.selectedVideoId.set(null);
-    this.location.go('/');
-  }
-
-  onModalBackdropClick(event: Event): void {
-    if (event.target === event.currentTarget) {
-      this.closeVideoModal();
-    }
-  }
-
   reloadMedia(): void {
     this.resetFeed();
   }
@@ -359,19 +277,6 @@ export class Browse {
     return Number.isNaN(parsed.getTime())
       ? unknown
       : parsed.toLocaleDateString(this.language.current());
-  }
-
-  formatDuration(seconds: number | undefined): string {
-    if (seconds === undefined || !Number.isFinite(seconds) || seconds <= 0) {
-      return this.language.t('browse.unknownDuration');
-    }
-    const total = Math.floor(seconds);
-    const hours = Math.floor(total / 3600);
-    const minutes = Math.floor((total % 3600) / 60);
-    const secs = String(total % 60).padStart(2, '0');
-    return hours > 0
-      ? `${hours}:${String(minutes).padStart(2, '0')}:${secs}`
-      : `${minutes}:${secs}`;
   }
 
   private preloadThumbnails(docs: MediaDoc[]): void {
@@ -402,48 +307,6 @@ export class Browse {
       // Prefetch is best-effort; the real page load will surface errors.
     } finally {
       this.preloadingPageKeys.delete(key);
-    }
-  }
-
-  private async loadVideoStream(videoId: string): Promise<void> {
-    // Keep fetched stream URLs to avoid redundant play calls.
-    if (this.streamUrlByVideoId()[videoId]) {
-      return;
-    }
-    const provider =
-      this.videos().find((video) => video.id === videoId)?.provider ?? DEFAULT_PROVIDER;
-
-    this.streamErrorByVideoId.update((errors) => ({ ...errors, [videoId]: false }));
-    const url = await this.api.play(videoId, provider);
-    if (url === null) {
-      this.streamErrorByVideoId.update((errors) => ({ ...errors, [videoId]: true }));
-      return;
-    }
-    this.streamUrlByVideoId.update((byId) => ({ ...byId, [videoId]: url }));
-    // The play call recorded it server-side; reflect that on the card right away.
-    this.allDocs.update((docs) =>
-      docs.map((doc) =>
-        (doc.identifier ?? doc.external_id) === videoId && doc.watched !== true
-          ? { ...doc, watched: true }
-          : doc,
-      ),
-    );
-  }
-
-  private syncSelectedVideoFromPath(url: string): void {
-    const path = url.split(/[?#]/)[0].replace(/\/+$/, '');
-    const match = WATCH_PATH.exec(path);
-    let videoId: string | null = null;
-    if (match?.[1] !== undefined) {
-      try {
-        videoId = decodeURIComponent(match[1]);
-      } catch {
-        videoId = null;
-      }
-    }
-    this.selectedVideoId.set(videoId);
-    if (videoId !== null) {
-      void this.loadVideoStream(videoId);
     }
   }
 
@@ -492,11 +355,4 @@ function yearOf(date: string | undefined): string {
 
 function cacheKeyOf(params: MediaListParams): string {
   return `${params.query}::${params.page}`;
-}
-
-/** The item's page on its source site. */
-function sourceUrl(provider: string, id: string): string {
-  return provider === 'publicdomaintorrents'
-    ? `https://www.publicdomaintorrents.info/nshowmovie.html?movieid=${encodeURIComponent(id)}`
-    : `https://archive.org/details/${encodeURIComponent(id)}`;
 }

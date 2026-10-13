@@ -36,6 +36,14 @@ type Media struct {
 	ImdbID     string   `json:"imdb_id,omitempty"`
 	ImdbRating float64  `json:"imdb_rating"`
 
+	// Credits from OMDB (details only; not persisted, re-read from the
+	// OMDB cache). OMDB has no producer field: Production is the production
+	// company and Writers the screenplay credits.
+	Directors  []string `json:"directors,omitempty"`
+	Writers    []string `json:"writers,omitempty"`
+	Production string   `json:"production,omitempty"`
+	PosterURL  string   `json:"poster_url,omitempty"`
+
 	// Watched is set on list/search results for the session user (42-13).
 	Watched bool `json:"watched"`
 

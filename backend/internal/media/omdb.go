@@ -28,6 +28,12 @@ const (
 
 type omdbResponse struct {
 	Actors     string `json:"Actors"`
+	Director   string `json:"Director"`
+	Writer     string `json:"Writer"`
+	Production string `json:"Production"`
+	Runtime    string `json:"Runtime"`
+	Plot       string `json:"Plot"`
+	Poster     string `json:"Poster"`
 	Genre      string `json:"Genre"`
 	Year       string `json:"Year"`
 	ImdbID     string `json:"imdbID"`
@@ -42,6 +48,13 @@ type omdbInfo struct {
 	Actors []string
 	Genres []string
 	Year   string
+
+	Directors  []string
+	Writers    []string
+	Production string  // production company; "" when OMDB has none
+	Runtime    float64 // seconds; 0 when unknown
+	Plot       string
+	Poster     string
 }
 
 type omdbEntry struct {
@@ -146,11 +159,40 @@ func omdbFetch(ctx context.Context, apiKey string, q omdbQuery) (*omdbInfo, erro
 		Actors: splitOMDBList(body.Actors),
 		Genres: splitOMDBList(body.Genre),
 		Year:   mediaYear(body.Year),
+
+		Directors:  splitOMDBList(body.Director),
+		Writers:    splitOMDBList(body.Writer),
+		Production: omdbString(body.Production),
+		Runtime:    parseRuntime(body.Runtime),
+		Plot:       omdbString(body.Plot),
+		Poster:     omdbString(body.Poster),
 	}
 	if r, err := strconv.ParseFloat(body.ImdbRating, 64); err == nil {
 		info.Rating = r
 	}
 	return info, nil
+}
+
+// omdbString maps OMDB's "N/A" placeholder to "".
+func omdbString(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "N/A" {
+		return ""
+	}
+	return s
+}
+
+// parseRuntime turns OMDB's "Runtime" ("94 min") into seconds; 0 if unknown.
+func parseRuntime(s string) float64 {
+	f := strings.Fields(s)
+	if len(f) == 0 {
+		return 0
+	}
+	n, err := strconv.Atoi(f[0])
+	if err != nil || n <= 0 {
+		return 0
+	}
+	return float64(n * 60)
 }
 
 // splitOMDBList splits OMDB's "A, B, C" fields; "N/A" is empty.
@@ -181,6 +223,16 @@ func applyOMDB(m *Media, info *omdbInfo) {
 	if m.Year == "" {
 		m.Year = info.Year
 	}
+	m.Directors = info.Directors
+	m.Writers = info.Writers
+	m.Production = info.Production
+	if m.DurationSeconds <= 0 {
+		m.DurationSeconds = info.Runtime
+	}
+	if m.Description == "" {
+		m.Description = info.Plot
+	}
+	m.PosterURL = info.Poster
 }
 
 // enrichOMDB looks every item up concurrently (bounded by omdbWorkers),

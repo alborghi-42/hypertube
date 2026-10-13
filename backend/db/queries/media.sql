@@ -38,3 +38,8 @@ SET download_status = '', local_path = NULL, public_url = NULL,
 WHERE media_id = sqlc.arg(media_id)
   AND download_status IN ('downloaded', 'downloading', 'failed')
   AND COALESCE(last_watched_at, updated_at) < sqlc.arg(cutoff)::timestamptz;
+
+-- name: SetMediaDuration :exec
+-- Fills the runtime once (from OMDB) without touching download state.
+UPDATE media SET duration_seconds = $2
+WHERE media_id = $1 AND COALESCE(duration_seconds, 0) <= 0;

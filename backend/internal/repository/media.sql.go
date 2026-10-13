@@ -187,6 +187,22 @@ func (q *Queries) ResetExpiredMedia(ctx context.Context, arg ResetExpiredMediaPa
 	return result.RowsAffected(), nil
 }
 
+const setMediaDuration = `-- name: SetMediaDuration :exec
+UPDATE media SET duration_seconds = $2
+WHERE media_id = $1 AND COALESCE(duration_seconds, 0) <= 0
+`
+
+type SetMediaDurationParams struct {
+	MediaID         pgtype.UUID
+	DurationSeconds *float64
+}
+
+// Fills the runtime once (from OMDB) without touching download state.
+func (q *Queries) SetMediaDuration(ctx context.Context, arg SetMediaDurationParams) error {
+	_, err := q.db.Exec(ctx, setMediaDuration, arg.MediaID, arg.DurationSeconds)
+	return err
+}
+
 const touchMediaWatched = `-- name: TouchMediaWatched :exec
 UPDATE media SET last_watched_at = now() WHERE media_id = $1
 `

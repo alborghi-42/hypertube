@@ -132,7 +132,7 @@
   } @else {
     <section class="video-grid" [attr.aria-label]="'browse.results' | transloco">
       @for (video of filteredVideos(); track video.id) {
-        <article
+        <a
           class="video-card"
           [class.watched]="video.watched"
           title="{{ video.title }}"
@@ -140,11 +140,7 @@
             (video.watched ? 'browse.videoAriaWatched' : 'browse.videoAria')
               | transloco: { title: video.title, channel: video.channel }
           "
-          role="button"
-          tabindex="0"
-          (click)="openVideoModal(video.id)"
-          (keydown.enter)="openVideoModal(video.id)"
-          (keydown.space)="openVideoModal(video.id); $event.preventDefault()"
+          [routerLink]="['/movie', video.provider, video.id]"
         >
           <div class="thumbnail" [style.--video-accent]="video.accent">
             <img
@@ -183,7 +179,7 @@
               <p class="genres">{{ video.genres.join(', ') }}</p>
             }
           </div>
-        </article>
+        </a>
       } @empty {
         <div class="empty-state">
           <h2>{{ 'browse.emptyTitle' | transloco }}</h2>
@@ -210,100 +206,6 @@
       </div>
     } @else if (!hasMore() && allDocs().length) {
       <p class="end-of-feed">{{ 'browse.endOfFeed' | transloco }}</p>
-    }
-
-    @if (selectedVideo(); as activeVideo) {
-      <div class="video-modal-backdrop" (pointerdown)="onModalBackdropClick($event)">
-        <section
-          class="video-modal"
-          role="dialog"
-          aria-modal="true"
-          [attr.aria-label]="'browse.streaming' | transloco: { title: activeVideo.title }"
-        >
-          <header class="video-modal-header">
-            <h2>{{ activeVideo.title }}</h2>
-            <button
-              type="button"
-              class="video-modal-close"
-              (click)="closeVideoModal()"
-              [attr.aria-label]="'browse.closePlayer' | transloco"
-            >
-              {{ 'common.close' | transloco }}
-            </button>
-          </header>
-
-          <div class="video-player-wrap">
-            @if (selectedVideoStreamUrl(); as streamUrl) {
-              <video class="video-player" [src]="streamUrl" controls autoplay playsinline></video>
-            } @else if (selectedVideoHasStreamError()) {
-              <div class="resource-state error" aria-live="assertive">
-                <h3>{{ 'browse.streamErrorTitle' | transloco }}</h3>
-                <p>{{ 'browse.streamErrorBody' | transloco }}</p>
-              </div>
-            } @else {
-              <div
-                class="video-player-loading"
-                aria-live="polite"
-                [attr.aria-label]="'browse.playerLoadingAria' | transloco"
-              >
-                <div class="video-player-loading-surface">
-                  <span class="video-player-loader" aria-hidden="true"></span>
-                  <p>{{ 'browse.playerLoading' | transloco }}</p>
-                </div>
-              </div>
-            }
-          </div>
-
-          <section
-            class="video-modal-details"
-            [attr.aria-label]="'browse.mediaDetails' | transloco"
-          >
-            <p class="video-modal-meta video-modal-meta-primary">
-              {{ activeVideo.year || ('browse.unknownYear' | transloco) }} |
-              @if (activeVideo.rating !== null) {
-                {{ 'browse.imdbRating' | transloco: { rating: activeVideo.rating.toFixed(1) } }} |
-              }
-              @if (activeVideo.genres.length) {
-                {{ activeVideo.genres.join(', ') }} |
-              }
-              <a [href]="activeVideo.detailsUrl" target="_blank" rel="noopener noreferrer">{{
-                'browse.openArchive' | transloco
-              }}</a>
-            </p>
-
-            @if (selectedVideoDetailsResource.isLoading()) {
-              <p class="video-modal-meta video-modal-meta-status">
-                {{ 'browse.detailsLoading' | transloco }}
-              </p>
-            } @else if (selectedVideoDetailsResource.error()) {
-              <p class="video-modal-meta video-modal-meta-status">
-                {{ 'browse.detailsFailed' | transloco }}
-              </p>
-            } @else if (selectedVideoDetails(); as details) {
-              @if (details.description?.trim()) {
-                <p class="video-modal-description">{{ details.description }}</p>
-              }
-
-              <div
-                class="video-modal-detail-row"
-                [attr.aria-label]="'browse.extendedMetadata' | transloco"
-              >
-                <span class="video-modal-detail-chip">{{
-                  details.creator?.trim() || activeVideo.channel
-                }}</span>
-                <span class="video-modal-detail-chip">{{ formatPublishedDate(details.date) }}</span>
-                <span class="video-modal-detail-chip">{{
-                  formatDuration(details.duration_seconds)
-                }}</span>
-              </div>
-
-              @if (details.id; as mediaId) {
-                <app-media-comments [mediaId]="mediaId" />
-              }
-            }
-          </section>
-        </section>
-      </div>
     }
   }
 

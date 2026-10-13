@@ -39,6 +39,18 @@ export interface MediaDetails {
   date?: string;
   duration_seconds?: number;
   imdb_rating?: number;
+  thumbnail_url?: string;
+  /** OMDb poster, preferred over the provider thumbnail for the cover. */
+  poster_url?: string;
+  year?: string;
+  genres?: string[] | null;
+  actors?: string[] | null;
+  directors?: string[] | null;
+  /** Screenplay credits (OMDb has no producer field). */
+  writers?: string[] | null;
+  /** Production company, from OMDb. */
+  production?: string;
+  imdb_id?: string;
 }
 
 export interface MediaPlayResponse {
@@ -97,6 +109,17 @@ export class MediaApi {
 
   /** Starts (or reuses) the server-side download; resolves to the playable URL or null. */
   async play(externalId: string, provider: string): Promise<string | null> {
+    return (await this.playStream(externalId, provider))?.url ?? null;
+  }
+
+  /**
+   * Like play(), with the whole response: status (200 available/ready, 202 downloading) and
+   * the transcoded flag. Resolves to null on failure or when no url is returned.
+   */
+  async playStream(
+    externalId: string,
+    provider: string,
+  ): Promise<(MediaPlayResponse & { url: string }) | null> {
     const params = new URLSearchParams({ external_id: externalId, provider });
     const response = await fetch(`${API_BASE}/media/play?${params}`).catch(() => null);
     if (response?.ok !== true) {
@@ -105,7 +128,7 @@ export class MediaApi {
     const payload = (await response.json()) as MediaPlayResponse;
     // The backend answers root-relative ("/stream/files/..."): resolve it against <base href> instead.
     const url = payload.url?.trim().replace(/^\/+/, '') ?? '';
-    return url.length > 0 ? url : null;
+    return url.length > 0 ? { ...payload, url } : null;
   }
 }
 

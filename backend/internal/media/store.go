@@ -293,3 +293,12 @@ func (s *Store) WatchedSet(ctx context.Context, userID pgtype.UUID, mediaIDs []s
 	}
 	return set, nil
 }
+
+// SetDuration stores the runtime if the row has none yet.
+func (s *Store) SetDuration(ctx context.Context, id string, seconds float64) error {
+	uid, err := toUUID(id)
+	if err != nil {
+		return err
+	}
+	return s.q.SetMediaDuration(ctx, repository.SetMediaDurationParams{MediaID: uid, DurationSeconds: &seconds})
+}

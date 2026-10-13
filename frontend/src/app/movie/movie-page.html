@@ -1,0 +1,108 @@
+<div class="movie-shell">
+  <a class="back-link" routerLink="/">{{ 'movie.back' | transloco }}</a>
+
+  @if (movie(); as m) {
+    <article class="movie">
+      <header class="movie-head">
+        @if (m.cover) {
+          <img
+            class="cover"
+            [src]="m.cover"
+            [alt]="'movie.coverAlt' | transloco: { title: m.title }"
+          />
+        }
+        <div class="head-text">
+          <h1>{{ m.title }}</h1>
+          <p class="facts">
+            <span>{{ m.year || ('movie.unknownYear' | transloco) }}</span>
+            <span>{{ m.length || ('movie.unknownLength' | transloco) }}</span>
+            <span
+              class="rating"
+              [attr.aria-label]="
+                m.rating === null
+                  ? ('movie.noRating' | transloco)
+                  : ('movie.ratingAria' | transloco: { rating: m.rating })
+              "
+            >
+              {{
+                m.rating === null
+                  ? ('movie.noRating' | transloco)
+                  : ('movie.rating' | transloco: { rating: m.rating.toFixed(1) })
+              }}
+            </span>
+          </p>
+          @if (m.genres.length) {
+            <ul class="genres" [attr.aria-label]="'movie.genres' | transloco">
+              @for (genre of m.genres; track genre) {
+                <li>{{ genre }}</li>
+              }
+            </ul>
+          }
+          <p class="summary">{{ m.summary || ('movie.noSummary' | transloco) }}</p>
+        </div>
+      </header>
+
+      <app-media-player [externalId]="externalId()" [provider]="provider()" [poster]="m.cover" />
+
+      <section class="credits" [attr.aria-label]="'movie.credits' | transloco">
+        <h2>{{ 'movie.credits' | transloco }}</h2>
+        <dl>
+          <div>
+            <dt>{{ 'movie.director' | transloco }}</dt>
+            <dd>{{ m.directors.join(', ') || ('movie.unknown' | transloco) }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'movie.production' | transloco }}</dt>
+            <dd>{{ m.production || ('movie.unknown' | transloco) }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'movie.writers' | transloco }}</dt>
+            <dd>{{ m.writers.join(', ') || ('movie.unknown' | transloco) }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'movie.cast' | transloco }}</dt>
+            <dd>{{ m.cast.join(', ') || ('movie.unknown' | transloco) }}</dd>
+          </div>
+          @if (m.creator) {
+            <div>
+              <dt>{{ 'movie.sourceCredit' | transloco }}</dt>
+              <dd>{{ m.creator }}</dd>
+            </div>
+          }
+        </dl>
+        <p class="links">
+          @if (m.imdbId) {
+            <a
+              [href]="'https://www.imdb.com/title/' + m.imdbId + '/'"
+              target="_blank"
+              rel="noopener noreferrer"
+              >{{ 'movie.openImdb' | transloco }}</a
+            >
+          }
+          <a [href]="m.sourceUrl" target="_blank" rel="noopener noreferrer">{{
+            'movie.openSource' | transloco: { provider: provider() }
+          }}</a>
+        </p>
+      </section>
+
+      @if (m.id) {
+        <section class="comments">
+          <app-media-comments [mediaId]="m.id" />
+        </section>
+      }
+    </article>
+  } @else if (details.error()) {
+    <div class="state error" aria-live="assertive">
+      <h1>{{ 'movie.errorTitle' | transloco }}</h1>
+      <p>{{ 'movie.errorBody' | transloco }}</p>
+      <button type="button" class="retry-btn" (click)="details.reload()">
+        {{ 'common.retry' | transloco }}
+      </button>
+    </div>
+  } @else {
+    <div class="state" aria-live="polite">
+      <span class="loader" aria-hidden="true"></span>
+      <p>{{ 'movie.loading' | transloco }}</p>
+    </div>
+  }
+</div>

@@ -1,4 +1,5 @@
-import { Routes } from '@angular/router';
+import { inject } from '@angular/core';
+import { Router, Routes } from '@angular/router';
 
 import { authGuard, guestGuard } from './auth/auth.guard';
 import { ForgotPassword } from './auth/forgot-password/forgot-password';
@@ -7,6 +8,8 @@ import { CompleteProfile } from './auth/oauth/complete-profile';
 import { Register } from './auth/register/register';
 import { ResetPassword } from './auth/reset-password/reset-password';
 import { Browse } from './browse/browse';
+import { DEFAULT_PROVIDER } from './media/media-api';
+import { MoviePage } from './movie/movie-page';
 import { Profile } from './profile/profile';
 import { UserProfile } from './profile/user-profile';
 
@@ -14,8 +17,19 @@ import { UserProfile } from './profile/user-profile';
 export const routes: Routes = [
   // Library and video pages are for logged-in users only.
   { path: '', component: Browse, canActivate: [authGuard] },
-  // Same page with the player modal open; deep-linkable.
-  { path: 'watch/:id', component: Browse, canActivate: [authGuard] },
+  // Movie page: provider + external id resolve on the backend even before a media row exists.
+  {
+    path: 'movie/:provider/:externalId',
+    component: MoviePage,
+    title: 'titles.movie',
+    canActivate: [authGuard],
+  },
+  // Old player-modal links (always archive.org ids at the time).
+  {
+    path: 'watch/:id',
+    redirectTo: ({ params }) =>
+      inject(Router).createUrlTree(['/movie', DEFAULT_PROVIDER, params['id'] ?? '']),
+  },
   { path: 'profile', component: Profile, title: 'titles.profile', canActivate: [authGuard] },
   {
     path: 'users/:username',

@@ -1,0 +1,32 @@
+<div class="player-wrap">
+  @if (!requested()) {
+    <button type="button" class="player-start" (click)="start()">
+      @if (poster()) {
+        <img class="player-backdrop" [src]="poster()" alt="" />
+      }
+      <span class="play-icon" aria-hidden="true"></span>
+      <span class="play-label">{{ 'player.play' | transloco }}</span>
+    </button>
+  } @else if (stream.value(); as s) {
+    <video class="player" [src]="s.url" controls autoplay playsinline></video>
+  } @else if (stream.error()) {
+    <div class="player-state error" aria-live="assertive">
+      <h3>{{ 'player.errorTitle' | transloco }}</h3>
+      <p>{{ 'player.errorBody' | transloco }}</p>
+      <button type="button" class="retry-btn" (click)="retry()">
+        {{ 'common.retry' | transloco }}
+      </button>
+    </div>
+  } @else {
+    <div class="player-state" aria-live="polite">
+      <span class="loader" aria-hidden="true"></span>
+      <p>{{ 'player.loading' | transloco }}</p>
+    </div>
+  }
+</div>
+@if (downloading()) {
+  <p class="player-note" aria-live="polite">{{ 'player.downloading' | transloco }}</p>
+}
+@if (transcoded()) {
+  <p class="player-note">{{ 'player.transcoded' | transloco }}</p>
+}

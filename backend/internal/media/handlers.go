@@ -5,6 +5,8 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"os"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -21,19 +23,19 @@ const defaultProvider = "archive.org"
 
 // Handler serves the media and comments API.
 type Handler struct {
-	store       *Store
-	providers   Registry
-	downloadDir string
-	log         *slog.Logger
+	store     *Store
+	providers Registry
+	engine    *Engine
+	log       *slog.Logger
 }
 
-func NewHandler(store *Store, providers Registry, downloadDir string, log *slog.Logger) *Handler {
-	return &Handler{store: store, providers: providers, downloadDir: downloadDir, log: log}
+func NewHandler(store *Store, providers Registry, engine *Engine, log *slog.Logger) *Handler {
+	return &Handler{store: store, providers: providers, engine: engine, log: log}
 }
 
 // RegisterRoutes mounts the public movie GETs on api (the /api group), the
 // rest of the JSON API on authed (/api behind a session check) and the
-// downloaded files on stream (the /stream group, also session-only).
+// video streams on stream (the /stream group, also session-only).
 func (h *Handler) RegisterRoutes(api, authed, stream *gin.RouterGroup) {
 	api.GET("/media", h.fetchMedia)
 	api.GET("/media/search", h.searchMedia)
@@ -48,8 +50,10 @@ func (h *Handler) RegisterRoutes(api, authed, stream *gin.RouterGroup) {
 	authed.PATCH("/media/:mediaId/comments/:commentId", h.patchComment)
 	authed.DELETE("/media/:mediaId/comments/:commentId", h.deleteComment)
 
-	// Downloaded files; http.FileServer handles Range requests for seeking.
-	stream.Static("/files", h.downloadDir)
+	// Range-capable video stream: from the torrent while downloading, from
+	// disk once complete (see streamMedia).
+	stream.GET("/media/:mediaId", h.streamMedia)
+	stream.HEAD("/media/:mediaId", h.streamMedia)
 }
 
 // publicURL turns a stored public_url ("stream/files/...") into a
@@ -168,10 +172,12 @@ func (h *Handler) getMediaDetails(c *gin.Context) {
 	c.JSON(http.StatusOK, saved)
 }
 
-// GET /api/media/play?external_id=&provider= — starts a background download
-// and holds the response until it reaches 5% (200, status "ready"), or
-// answers 202 "downloading" after 15s. Already known media return 200
-// "available" immediately.
+// GET /api/media/play?external_id=&provider= — makes the media playable.
+// Fully downloaded media answer 200 "available" at once. Otherwise the
+// torrent download is started (or joined: concurrent calls share one job)
+// in the background and the response waits up to 15s for enough of the
+// file head to start playback: 200 "ready", else 202 "downloading". In
+// every case url streams the video (blocking on missing pieces).
 func (h *Handler) playMedia(c *gin.Context) {
 	externalID := c.Query("external_id")
 	if externalID == "" {
@@ -184,96 +190,112 @@ func (h *Handler) playMedia(c *gin.Context) {
 	}
 	internalID := InternalID(externalID, name)
 	ctx := c.Request.Context()
-
-	if m, err := h.store.GetMedia(ctx, internalID); err == nil {
-		if m.DownloadStatus == "downloaded" || m.DownloadStatus == "downloading" || m.LocalPath != "" {
-			c.JSON(http.StatusOK, MediaStream{
-				InternalID: internalID,
-				ExternalID: externalID,
-				Provider:   name,
-				Status:     "available",
-				URL:        publicURL(m.PublicURL),
-				Message:    "Media already available",
-			})
-			return
-		}
-	}
-
-	progress := make(chan int, 100)
-
-	// Detached from the request context so the download outlives the response.
-	go func() {
-		dlCtx, cancel := context.WithTimeout(context.Background(), time.Hour)
-		defer cancel()
-
-		filePath, err := p.Download(dlCtx, externalID, progress, h.store)
-		bg := context.Background()
-		m, getErr := h.store.GetMedia(bg, internalID)
-		if err != nil {
-			h.log.Error("background download failed", "external_id", externalID, "error", err)
-			if getErr == nil {
-				m.DownloadStatus = "failed"
-				_, _ = h.store.UpdateMedia(bg, m)
-			}
-			return
-		}
-		if getErr == nil {
-			m.DownloadStatus = "downloaded"
-			m.LocalPath = filePath
-			_, _ = h.store.UpdateMedia(bg, m)
-		}
-	}()
-
-	const threshold = 5
-	timer := time.NewTimer(15 * time.Second)
-	defer timer.Stop()
-
-waitLoop:
-	for {
-		select {
-		case pct, ok := <-progress:
-			if !ok {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Download failed or discontinued before reaching stable threshold", "internal_id": internalID})
-				return
-			}
-			if pct >= threshold {
-				break waitLoop
-			}
-		case <-timer.C:
-			m, err := h.store.GetMedia(ctx, internalID)
-			if err != nil {
-				h.log.Error("media status unavailable after timeout", "media_id", internalID, "error", err)
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Download initiated but failed to retrieve media status after timeout", "internal_id": internalID})
-				return
-			}
-			c.JSON(http.StatusAccepted, MediaStream{
-				InternalID: internalID,
-				ExternalID: externalID,
-				Provider:   name,
-				Status:     "downloading",
-				URL:        publicURL(m.PublicURL),
-				Message:    "Download initiated but progress is slow",
-			})
-			return
-		case <-ctx.Done():
-			return
-		}
+	resp := func(status int, state, msg string) {
+		c.JSON(status, MediaStream{
+			InternalID: internalID,
+			ExternalID: externalID,
+			Provider:   name,
+			Status:     state,
+			URL:        publicURL(path.Join(StreamPrefix, internalID)),
+			Message:    msg,
+		})
 	}
 
 	m, err := h.store.GetMedia(ctx, internalID)
+	if errors.Is(err, ErrNotFound) {
+		m, err = p.FetchByID(ctx, externalID)
+		if err == nil && m == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Media not found"})
+			return
+		}
+		if err == nil {
+			m.ID = internalID
+			m, err = h.store.CreateMedia(ctx, m)
+		}
+	}
 	if err != nil {
-		h.log.Error("media status unavailable after download start", "media_id", internalID, "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Download started but failed to retrieve media status", "internal_id": internalID})
+		h.log.Error("media lookup failed", "media_id", internalID, "error", err)
+		c.JSON(http.StatusBadGateway, gin.H{"error": "Failed to load media"})
 		return
 	}
-	c.JSON(http.StatusOK, MediaStream{
-		InternalID: internalID,
-		ExternalID: externalID,
-		Provider:   name,
-		Status:     "ready",
-		URL:        publicURL(m.PublicURL),
-		Message:    "Media download reached stable threshold",
-	})
+
+	// Only a completed download whose file is still on disk is "available";
+	// "failed" or a vanished file start a fresh download below.
+	if h.engine.Job(internalID) == nil && m.DownloadStatus == "downloaded" {
+		if abs, ok := h.engine.AbsPath(m.LocalPath); ok {
+			if _, err := os.Stat(abs); err == nil {
+				resp(http.StatusOK, "available", "Media already downloaded")
+				return
+			}
+		}
+	}
+
+	job, err := h.engine.Start(p, m)
+	if err != nil {
+		h.log.Error("torrent start failed", "media_id", internalID, "error", err)
+		c.JSON(http.StatusBadGateway, gin.H{"error": "Failed to start download", "internal_id": internalID})
+		return
+	}
+
+	timer := time.NewTimer(15 * time.Second)
+	defer timer.Stop()
+	select {
+	case <-job.Ready():
+		resp(http.StatusOK, "ready", "Enough data downloaded to start playback")
+	case <-job.Done():
+		if job.Err() != nil {
+			c.JSON(http.StatusBadGateway, gin.H{"error": "Download failed", "internal_id": internalID})
+			return
+		}
+		resp(http.StatusOK, "available", "Media downloaded")
+	case <-timer.C:
+		resp(http.StatusAccepted, "downloading", "Download in progress")
+	case <-ctx.Done():
+	}
+}
+
+// GET /stream/media/:mediaId — the video bytes, with Range support. While
+// the torrent is downloading, reads come from the torrent file reader, which
+// prioritises the requested range and blocks until its pieces arrive, so
+// playback (and seeking) works before the download completes.
+func (h *Handler) streamMedia(c *gin.Context) {
+	id := c.Param("mediaId")
+	if j := h.engine.Job(id); j != nil && j.acquire() {
+		defer j.release()
+		r := j.file.NewReader()
+		defer r.Close()
+		r.SetContext(c.Request.Context())
+		r.SetReadahead(8 << 20)
+		c.Header("Content-Type", j.MimeType)
+		http.ServeContent(c.Writer, c.Request, path.Base(j.RelPath), time.Time{}, r)
+		return
+	}
+
+	m, err := h.store.GetMedia(c.Request.Context(), id)
+	if err != nil || m.DownloadStatus != "downloaded" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Media not available; start it with /api/media/play"})
+		return
+	}
+	abs, ok := h.engine.AbsPath(m.LocalPath)
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Media not available"})
+		return
+	}
+	f, err := os.Open(abs)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Media file missing; start it again with /api/media/play"})
+		return
+	}
+	defer f.Close()
+	st, err := f.Stat()
+	if err != nil || st.IsDir() {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Media not available"})
+		return
+	}
+	if m.MimeType != "" {
+		c.Header("Content-Type", m.MimeType)
+	}
+	http.ServeContent(c.Writer, c.Request, st.Name(), st.ModTime(), f)
 }
 
 // --- comments ---

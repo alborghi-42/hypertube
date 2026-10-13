@@ -8,26 +8,19 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"os"
-	"path"
-	"path/filepath"
-	"strings"
 	"time"
-)
 
-// PublicFilesPrefix is the URL prefix downloaded files are served under
-// (see Handler.RegisterRoutes). Stored public_url values are relative to "/".
-const PublicFilesPrefix = "stream/files"
+	"github.com/anacrolix/torrent/metainfo"
+)
 
 // ArchiveOrg implements Provider for archive.org.
 type ArchiveOrg struct {
-	downloadDir string
-	omdbKey     string
-	log         *slog.Logger
+	omdbKey string
+	log     *slog.Logger
 }
 
-func NewArchiveOrg(downloadDir, omdbKey string, log *slog.Logger) *ArchiveOrg {
-	return &ArchiveOrg{downloadDir: downloadDir, omdbKey: omdbKey, log: log}
+func NewArchiveOrg(omdbKey string, log *slog.Logger) *ArchiveOrg {
+	return &ArchiveOrg{omdbKey: omdbKey, log: log}
 }
 
 func (a *ArchiveOrg) ID() string { return "archive.org" }
@@ -164,145 +157,30 @@ func (a *ArchiveOrg) Search(ctx context.Context, query string, page, rows int) (
 	return list, nil
 }
 
-// Download picks the best MP4/h.264 file of the item and downloads it over
-// HTTP into <downloadDir>/archive.org/<internal-id><ext>.
-func (a *ArchiveOrg) Download(ctx context.Context, id string, progress chan<- int, store *Store) (string, error) {
-	if progress != nil {
-		defer close(progress)
-	}
+// maxTorrentSize bounds the .torrent download (archive.org ones are KBs).
+const maxTorrentSize = 16 << 20
 
-	metadata, err := a.fetchMetadata(ctx, id)
+// TorrentSource fetches archive.org's generated <id>_archive.torrent. It
+// lists every file of the item (originals and derivatives) and carries
+// archive.org web seeds, so it downloads even with no other peers.
+func (a *ArchiveOrg) TorrentSource(ctx context.Context, id string) (*TorrentSource, error) {
+	esc := url.PathEscape(id)
+	torrentURL := fmt.Sprintf("https://archive.org/download/%s/%s_archive.torrent", esc, esc)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, torrentURL, nil)
 	if err != nil {
-		return "", err
-	}
-
-	// Prefer original files over derived ones.
-	var videoFileName string
-	for _, file := range metadata.Files {
-		format := strings.ToLower(file.Format)
-		if strings.Contains(format, "mp4") || strings.Contains(format, "h.264") || strings.Contains(format, "mpeg4") {
-			videoFileName = file.Name
-			if file.Source == "original" {
-				break
-			}
-		}
-	}
-	if videoFileName == "" {
-		return "", fmt.Errorf("no suitable MP4 file found for identifier: %s", id)
-	}
-
-	downloadURL := fmt.Sprintf("https://archive.org/download/%s/%s", id, videoFileName)
-	internalID := InternalID(id, a.ID())
-	ext := filepath.Ext(videoFileName)
-	if ext == "" {
-		ext = ".mp4"
-	}
-
-	providerDir := filepath.Join(a.downloadDir, a.ID())
-	if err := os.MkdirAll(providerDir, 0o755); err != nil {
-		return "", fmt.Errorf("failed to create storage directory: %w", err)
-	}
-	fileName := internalID + ext
-	localPath := filepath.Join(providerDir, fileName)
-	relPath := path.Join(a.ID(), fileName)
-	publicURL := path.Join(PublicFilesPrefix, relPath)
-
-	rating, actors, err := omdbStats(ctx, a.omdbKey, metadata.Metadata.Title)
-	if err != nil {
-		a.log.Warn("OMDB stats unavailable", "title", metadata.Metadata.Title, "error", err)
-	}
-
-	state := func(status string) *Media {
-		return &Media{
-			ID:             internalID,
-			ExternalID:     id,
-			Provider:       a.ID(),
-			Title:          metadata.Metadata.Title,
-			Description:    metadata.Metadata.Description,
-			Creator:        metadata.Metadata.Creator,
-			Date:           metadata.Metadata.Date,
-			ThumbnailURL:   thumbnailURL(id),
-			LocalPath:      relPath,
-			PublicURL:      publicURL,
-			DownloadStatus: status,
-			Actors:         actors,
-			ImdbRating:     rating,
-		}
-	}
-	persist := func(m *Media) {
-		if _, err := store.UpdateMedia(ctx, m); err != nil {
-			if _, err := store.CreateMedia(ctx, m); err != nil {
-				a.log.Warn("failed to persist media download state", "media_id", internalID, "status", m.DownloadStatus, "error", err)
-			}
-		}
-	}
-
-	// Persist the initial state before downloading so /api/media/play can read it.
-	persist(state("downloading"))
-
-	a.log.Info("starting download", "url", downloadURL, "path", localPath)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
-	if err != nil {
-		return "", err
+		return nil, err
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to download: status %d", resp.StatusCode)
+		return nil, fmt.Errorf("archive.org torrent returned status %d", resp.StatusCode)
 	}
-
-	out, err := os.Create(localPath)
+	mi, err := metainfo.Load(io.LimitReader(resp.Body, maxTorrentSize))
 	if err != nil {
-		return "", err
+		return nil, fmt.Errorf("parse archive.org torrent: %w", err)
 	}
-	defer out.Close()
-
-	// ContentLength is -1 with chunked encoding (common on archive.org); then
-	// no percentage is emitted and the final 100 below is the only signal.
-	total := resp.ContentLength
-	var downloaded int64
-	buf := make([]byte, 32*1024)
-	last := -1
-	for {
-		n, readErr := resp.Body.Read(buf)
-		if n > 0 {
-			if _, err := out.Write(buf[:n]); err != nil {
-				return relPath, err
-			}
-			downloaded += int64(n)
-			if total > 0 {
-				pct := int(float64(downloaded) / float64(total) * 100)
-				if pct > last {
-					last = pct
-					if progress != nil {
-						select {
-						case progress <- pct:
-						default: // channel full: keep downloading
-						}
-					}
-				}
-			}
-		}
-		if readErr == io.EOF {
-			break
-		}
-		if readErr != nil {
-			return relPath, readErr
-		}
-	}
-
-	// Always signal completion, so a chunked download is not reported as failed.
-	if progress != nil {
-		select {
-		case progress <- 100:
-		default:
-		}
-	}
-
-	persist(state("downloaded"))
-	a.log.Info("download completed", "external_id", id, "path", localPath)
-	return relPath, nil
+	return &TorrentSource{MetaInfo: mi}, nil
 }

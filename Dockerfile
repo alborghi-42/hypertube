@@ -38,5 +38,6 @@ ENV PORT=8080 \
 RUN mkdir -p /data && chown -R node:node /data /app
 USER node
 
-EXPOSE 8080
+# 8080 HTTP; 6881 BitTorrent peers (TORRENT_LISTEN_PORT), TCP+UDP.
+EXPOSE 8080 6881/tcp 6881/udp
 CMD ["/app/hypertube"]

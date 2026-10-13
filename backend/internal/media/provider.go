@@ -9,11 +9,9 @@ type Provider interface {
 	FetchPopular(ctx context.Context, page, rows int) ([]Media, error)
 	FetchByID(ctx context.Context, id string) (*Media, error)
 	Search(ctx context.Context, query string, page, rows int) ([]Media, error)
-	// Download fetches the item into local storage, reporting integer
-	// percentage progress on the channel (closed on return), and persists the
-	// download state through store. It returns the path relative to the
-	// download dir.
-	Download(ctx context.Context, id string, progress chan<- int, store *Store) (string, error)
+	// TorrentSource returns the .torrent or magnet the item is downloaded
+	// from; the Engine does the downloading, persistence and streaming.
+	TorrentSource(ctx context.Context, id string) (*TorrentSource, error)
 }
 
 // Registry maps provider IDs to providers.

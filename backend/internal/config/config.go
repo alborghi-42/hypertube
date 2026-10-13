@@ -4,6 +4,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Config holds all runtime configuration, sourced from environment variables
@@ -28,6 +29,11 @@ type Config struct {
 	SMTPUser     string
 	SMTPPassword string
 	SMTPFrom     string
+	// BitTorrent client (media downloads, DATA_DIR/downloads).
+	TorrentListenPort   int           // peer port, TCP+UDP; 0 = random
+	TorrentNoUpload     bool          // never upload to peers
+	TorrentSeed         bool          // keep seeding completed files
+	TorrentStallTimeout time.Duration // fail a download with no progress for this long; 0 = never
 }
 
 func Load() Config {
@@ -46,6 +52,11 @@ func Load() Config {
 		SMTPUser:     os.Getenv("SMTP_USER"),
 		SMTPPassword: os.Getenv("SMTP_PASSWORD"),
 		SMTPFrom:     envStr("SMTP_FROM", "hypertube@localhost"),
+
+		TorrentListenPort:   envInt("TORRENT_LISTEN_PORT", 6881),
+		TorrentNoUpload:     envBool("TORRENT_NO_UPLOAD", false),
+		TorrentSeed:         envBool("TORRENT_SEED", false),
+		TorrentStallTimeout: envDuration("TORRENT_STALL_TIMEOUT", 10*time.Minute),
 	}
 }
 
@@ -60,6 +71,15 @@ func envInt(key string, fallback int) int {
 	if v := os.Getenv(key); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			return n
+		}
+	}
+	return fallback
+}
+
+func envDuration(key string, fallback time.Duration) time.Duration {
+	if v := os.Getenv(key); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			return d
 		}
 	}
 	return fallback

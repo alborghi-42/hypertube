@@ -87,9 +87,25 @@ func main() {
 		mailer := mail.New(mail.Config{Host: cfg.SMTPHost, Port: cfg.SMTPPort, User: cfg.SMTPUser, Password: cfg.SMTPPassword, From: cfg.SMTPFrom}, log)
 		auth.NewResetHandler(pool, sessions, mailer, cfg.OAuth.PublicURL, cfg.BasePath, log).RegisterRoutes(api)
 
-		downloadDir := filepath.Join(cfg.DataDir, "downloads")
-		providers := media.NewRegistry(media.NewArchiveOrg(downloadDir, cfg.OMDBAPIKey, log))
-		media.NewHandler(media.NewStore(pool), providers, downloadDir, log).RegisterRoutes(api, authed, stream)
+		// Single shared BitTorrent client; closed after the HTTP server stops.
+		tc, err := media.NewTorrentClient(media.TorrentConfig{
+			DataDir:      filepath.Join(cfg.DataDir, "downloads"),
+			ListenPort:   cfg.TorrentListenPort,
+			NoUpload:     cfg.TorrentNoUpload,
+			Seed:         cfg.TorrentSeed,
+			StallTimeout: cfg.TorrentStallTimeout,
+		}, log)
+		if err != nil {
+			log.Error("torrent client failed to start", "error", err)
+			os.Exit(1)
+		}
+		store := media.NewStore(pool)
+		engine := media.NewEngine(tc, store, log)
+		// engine.PostProcess: mkv/avi conversion hook (ticket 42-16).
+		defer tc.Close()
+		defer engine.Close()
+		providers := media.NewRegistry(media.NewArchiveOrg(cfg.OMDBAPIKey, log))
+		media.NewHandler(store, providers, engine, log).RegisterRoutes(api, authed, stream)
 	} else {
 		log.Warn("auth and media routes disabled: they require DATABASE_URL")
 	}

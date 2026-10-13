@@ -56,6 +56,7 @@ func main() {
 	ssr := startSSR(ctx, cfg, log)
 
 	router := gin.New()
+	router.HandleMethodNotAllowed = true
 	router.Use(gin.Recovery())
 
 	router.GET("/healthz", func(c *gin.Context) {
@@ -88,8 +89,11 @@ func main() {
 		log.Warn("auth and media routes disabled: they require DATABASE_URL")
 	}
 
-	// Everything that is not /api, /stream or /healthz is the Angular app.
-	router.NoRoute(ssrProxy(cfg, log))
+	// Everything that is not /api, /stream or /healthz is the Angular app;
+	// unknown paths or methods on those prefixes get a JSON error instead.
+	ssrFallback := ssrProxy(cfg, log)
+	router.NoRoute(backendError(http.StatusNotFound, "Not found", ssrFallback))
+	router.NoMethod(backendError(http.StatusMethodNotAllowed, "Method not allowed", ssrFallback))
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
@@ -159,6 +163,32 @@ func ssrProxy(cfg config.Config, log *slog.Logger) gin.HandlerFunc {
 		c.Request.URL.Path = cfg.BasePath + c.Request.URL.Path
 		c.Request.URL.RawPath = ""
 		proxy.ServeHTTP(c.Writer, c.Request)
+	}
+}
+
+// isBackendPath reports whether path belongs to the Go server (/api, /stream,
+// /healthz and anything below them) rather than the Angular app. Paths are
+// already stripped of the base path by withBasePath.
+func isBackendPath(path string) bool {
+	for _, prefix := range []string{"/api", "/stream", "/healthz"} {
+		if path == prefix || strings.HasPrefix(path, prefix+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+// backendError answers backend paths with a JSON error and hands every other
+// path to fallback (the SSR proxy), so SPA routes keep working for any method.
+func backendError(status int, message string, fallback gin.HandlerFunc) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if isBackendPath(c.Request.URL.Path) {
+			c.AbortWithStatusJSON(status, gin.H{"error": message})
+			return
+		}
+		// gin sets Allow before NoMethod handlers; it does not apply to the SSR response.
+		c.Writer.Header().Del("Allow")
+		fallback(c)
 	}
 }
 

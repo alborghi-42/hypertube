@@ -21,6 +21,7 @@ import (
 
 	"github.com/alborghi-42/hypertube/backend/internal/auth"
 	"github.com/alborghi-42/hypertube/backend/internal/config"
+	"github.com/alborghi-42/hypertube/backend/internal/httpsec"
 	"github.com/alborghi-42/hypertube/backend/internal/mail"
 	"github.com/alborghi-42/hypertube/backend/internal/media"
 	"github.com/alborghi-42/hypertube/backend/internal/publicapi"
@@ -60,6 +61,16 @@ func main() {
 	router := gin.New()
 	router.HandleMethodNotAllowed = true
 	router.Use(gin.Recovery())
+	// X-Forwarded-For is only honoured from TRUSTED_PROXIES (default: nobody).
+	if err := router.SetTrustedProxies(httpsec.TrustedProxies()); err != nil {
+		log.Error("invalid TRUSTED_PROXIES", "error", err)
+		os.Exit(1)
+	}
+	router.Use(
+		httpsec.Headers(cfg.CookieSecure),
+		httpsec.BodyLimit(httpsec.DefaultBodyLimit, "/api/users/me/avatar"),
+		httpsec.RateLimit(httpsec.DefaultRules()),
+	)
 
 	router.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
@@ -131,6 +142,8 @@ func main() {
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
 		Handler:           withBasePath(cfg.BasePath, router),
 		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       2 * time.Minute,
+		// No WriteTimeout: video streams stay open for the whole playback.
 	}
 
 	go func() {

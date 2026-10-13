@@ -19,6 +19,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/alborghi-42/hypertube/backend/internal/auth"
 	"github.com/alborghi-42/hypertube/backend/internal/config"
 	"github.com/alborghi-42/hypertube/backend/internal/media"
 )
@@ -61,20 +62,30 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
-	api := router.Group("/api")
+	// Every /api route goes through the CSRF check (double-submit cookie).
+	cookies := auth.CookieOptions{Path: cfg.CookiePath(), Secure: cfg.CookieSecure}
+	api := router.Group("/api", auth.CSRF(cookies))
 	{
 		api.GET("/ping", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"message": "pong"})
 		})
 	}
-	stream := router.Group("/stream")
 
 	if pool != nil {
+		// Public: auth entry points (register/login/logout, later OAuth and
+		// password reset) and the public movie GETs. Everything else on /api
+		// and all of /stream requires a session.
+		sessions := auth.NewSessions(pool, cookies)
+		authed := api.Group("", sessions.Require())
+		stream := router.Group("/stream", sessions.Require())
+
+		auth.NewHandler(pool, sessions, log).RegisterRoutes(api, authed)
+
 		downloadDir := filepath.Join(cfg.DataDir, "downloads")
 		providers := media.NewRegistry(media.NewArchiveOrg(downloadDir, cfg.OMDBAPIKey, log))
-		media.NewHandler(media.NewStore(pool), providers, downloadDir, log).RegisterRoutes(api, stream)
+		media.NewHandler(media.NewStore(pool), providers, downloadDir, log).RegisterRoutes(api, authed, stream)
 	} else {
-		log.Warn("media routes disabled: they require DATABASE_URL")
+		log.Warn("auth and media routes disabled: they require DATABASE_URL")
 	}
 
 	// Everything that is not /api, /stream or /healthz is the Angular app.

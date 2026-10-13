@@ -17,17 +17,21 @@ type Config struct {
 	DataDir     string // Root for torrent/hls/subtitle storage (PVC in production)
 	OMDBAPIKey  string // Optional: enriches media with IMDb rating/actors; empty skips it
 	BasePath    string // Public path prefix (e.g. /hypertube behind the portal); empty = served at /
+	// CookieSecure sets the Secure flag on session/CSRF cookies. Default true;
+	// set COOKIE_SECURE=false only for local development over plain http.
+	CookieSecure bool
 }
 
 func Load() Config {
 	return Config{
-		Port:        envInt("PORT", 8080),
-		DatabaseURL: os.Getenv("DATABASE_URL"),
-		SSRUpstream: envStr("SSR_UPSTREAM", "http://127.0.0.1:4000"),
-		SSRCommand:  os.Getenv("SSR_COMMAND"),
-		DataDir:     envStr("DATA_DIR", "/data"),
-		OMDBAPIKey:  os.Getenv("OMDB_API_KEY"),
-		BasePath:    strings.TrimRight(os.Getenv("BASE_PATH"), "/"),
+		Port:         envInt("PORT", 8080),
+		DatabaseURL:  os.Getenv("DATABASE_URL"),
+		SSRUpstream:  envStr("SSR_UPSTREAM", "http://127.0.0.1:4000"),
+		SSRCommand:   os.Getenv("SSR_COMMAND"),
+		DataDir:      envStr("DATA_DIR", "/data"),
+		OMDBAPIKey:   os.Getenv("OMDB_API_KEY"),
+		BasePath:     strings.TrimRight(os.Getenv("BASE_PATH"), "/"),
+		CookieSecure: envBool("COOKIE_SECURE", true),
 	}
 }
 
@@ -45,4 +49,21 @@ func envInt(key string, fallback int) int {
 		}
 	}
 	return fallback
+}
+
+func envBool(key string, fallback bool) bool {
+	if v := os.Getenv(key); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			return b
+		}
+	}
+	return fallback
+}
+
+// CookiePath is the Path attribute for cookies: the base path, or "/".
+func (c Config) CookiePath() string {
+	if c.BasePath == "" {
+		return "/"
+	}
+	return c.BasePath
 }

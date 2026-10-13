@@ -32,19 +32,22 @@ func NewHandler(store *Store, providers Registry, downloadDir string, log *slog.
 	return &Handler{store: store, providers: providers, downloadDir: downloadDir, log: log}
 }
 
-// RegisterRoutes mounts the JSON API on api (the /api group) and the
-// downloaded files on stream (the /stream group).
-func (h *Handler) RegisterRoutes(api, stream *gin.RouterGroup) {
+// RegisterRoutes mounts the public movie GETs on api (the /api group), the
+// rest of the JSON API on authed (/api behind a session check) and the
+// downloaded files on stream (the /stream group, also session-only).
+func (h *Handler) RegisterRoutes(api, authed, stream *gin.RouterGroup) {
 	api.GET("/media", h.fetchMedia)
 	api.GET("/media/search", h.searchMedia)
 	api.GET("/media/details", h.getMediaDetails)
-	api.GET("/media/play", h.playMedia)
 
-	api.GET("/media/:mediaId/comments", h.getComments)
-	api.GET("/media/:mediaId/comments/:commentId", h.getComment)
-	api.POST("/media/:mediaId/comments", h.postComment)
-	api.PATCH("/media/:mediaId/comments/:commentId", h.patchComment)
-	api.DELETE("/media/:mediaId/comments/:commentId", h.deleteComment)
+	// Starts a server-side download: logged-in users only.
+	authed.GET("/media/play", h.playMedia)
+
+	authed.GET("/media/:mediaId/comments", h.getComments)
+	authed.GET("/media/:mediaId/comments/:commentId", h.getComment)
+	authed.POST("/media/:mediaId/comments", h.postComment)
+	authed.PATCH("/media/:mediaId/comments/:commentId", h.patchComment)
+	authed.DELETE("/media/:mediaId/comments/:commentId", h.deleteComment)
 
 	// Downloaded files; http.FileServer handles Range requests for seeking.
 	stream.Static("/files", h.downloadDir)

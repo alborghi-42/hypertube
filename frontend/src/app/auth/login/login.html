@@ -1,0 +1,38 @@
+<form class="auth-card" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <h1>Log in</h1>
+
+  <label class="field">
+    Username
+    <input
+      formControlName="username"
+      autocomplete="username"
+      [attr.aria-invalid]="controlError(form.controls.username, 'Username') !== null"
+    />
+    @if (controlError(form.controls.username, 'Username'); as message) {
+      <p class="field-error">{{ message }}</p>
+    }
+  </label>
+
+  <label class="field">
+    Password
+    <input
+      type="password"
+      formControlName="password"
+      autocomplete="current-password"
+      [attr.aria-invalid]="controlError(form.controls.password, 'Password') !== null"
+    />
+    @if (controlError(form.controls.password, 'Password'); as message) {
+      <p class="field-error">{{ message }}</p>
+    }
+  </label>
+
+  @if (formError(); as message) {
+    <p class="form-error" role="alert">{{ message }}</p>
+  }
+
+  <button type="submit" [disabled]="submitting()">
+    {{ submitting() ? 'Logging in...' : 'Log in' }}
+  </button>
+
+  <p class="switch">No account yet? <a routerLink="/register">Create one</a></p>
+</form>

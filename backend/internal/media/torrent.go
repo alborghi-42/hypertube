@@ -113,13 +113,14 @@ type Engine struct {
 	sf     singleflight.Group
 	mu     sync.Mutex
 	jobs   map[string]*Job
+	inUse  *watchTracker // active streams/conversions + last_watched_at throttle (42-18)
 }
 
 func NewEngine(tc *TorrentClient, store *Store, log *slog.Logger) *Engine {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Engine{
 		tc: tc, store: store, downloadDir: tc.cfg.DataDir, log: log,
-		ctx: ctx, cancel: cancel, jobs: map[string]*Job{},
+		ctx: ctx, cancel: cancel, jobs: map[string]*Job{}, inUse: newWatchTracker(),
 	}
 }
 

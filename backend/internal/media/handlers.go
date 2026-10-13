@@ -267,6 +267,7 @@ func (h *Handler) playMedia(c *gin.Context) {
 		c.JSON(http.StatusBadGateway, gin.H{"error": "Failed to load media"})
 		return
 	}
+	h.engine.TouchWatched(internalID)
 
 	// Only a completed download whose file is still on disk is "available";
 	// "failed" or a vanished file start a fresh download below.
@@ -311,6 +312,10 @@ func (h *Handler) playMedia(c *gin.Context) {
 // playback (and seeking) works before the download completes.
 func (h *Handler) streamMedia(c *gin.Context) {
 	id := c.Param("mediaId")
+	// Marks the media as in use (the retention job skips it) and bumps
+	// last_watched_at, at most once a minute per media.
+	defer h.engine.inUse.begin(id)()
+	h.engine.TouchWatched(id)
 	if j := h.engine.Job(id); j != nil && j.acquire() {
 		defer j.release()
 		r := j.file.NewReader()

@@ -36,6 +36,7 @@ type Medium struct {
 	Actors          []string
 	CreatedAt       pgtype.Timestamptz
 	UpdatedAt       pgtype.Timestamptz
+	LastWatchedAt   pgtype.Timestamptz
 }
 
 type OauthIdentity struct {

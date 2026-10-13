@@ -266,6 +266,7 @@ func (t *Transcoder) CachePostProcess(e *Engine) PostProcessFunc {
 		id := m.ID
 		dst := strings.TrimSuffix(absPath, filepath.Ext(absPath)) + ".mp4"
 		go func() {
+			defer e.inUse.begin(id)() // keeps the retention job off this media
 			began := time.Now()
 			if err := t.Convert(ctx, absPath, dst); err != nil {
 				t.log.Warn("background mp4 conversion failed", "media_id", id, "error", err)

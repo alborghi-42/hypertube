@@ -18,3 +18,23 @@ SET external_id = $2, provider = $3, title = $4, description = $5, creator = $6,
     imdb_rating = $15, actors = $16, updated_at = now()
 WHERE media_id = $1
 RETURNING *;
+
+-- name: TouchMediaWatched :exec
+UPDATE media SET last_watched_at = now() WHERE media_id = $1;
+
+-- name: ListExpiredMedia :many
+-- Downloads (or failed/partial leftovers) not watched since cutoff. Rows
+-- without last_watched_at fall back to updated_at.
+SELECT * FROM media
+WHERE download_status IN ('downloaded', 'downloading', 'failed')
+  AND COALESCE(last_watched_at, updated_at) < sqlc.arg(cutoff)::timestamptz
+ORDER BY COALESCE(last_watched_at, updated_at);
+
+-- name: ResetExpiredMedia :execrows
+-- Back to the never-downloaded state (the app stores '' for fresh rows), unless watched again since cutoff.
+UPDATE media
+SET download_status = '', local_path = NULL, public_url = NULL,
+    file_size = NULL, mime_type = NULL, updated_at = now()
+WHERE media_id = sqlc.arg(media_id)
+  AND download_status IN ('downloaded', 'downloading', 'failed')
+  AND COALESCE(last_watched_at, updated_at) < sqlc.arg(cutoff)::timestamptz;

@@ -18,7 +18,7 @@ INSERT INTO media (
     file_size, mime_type, imdb_rating, actors
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-RETURNING media_id, external_id, provider, title, description, creator, date, thumbnail_url, duration_seconds, download_status, local_path, public_url, file_size, mime_type, imdb_rating, actors, created_at, updated_at
+RETURNING media_id, external_id, provider, title, description, creator, date, thumbnail_url, duration_seconds, download_status, local_path, public_url, file_size, mime_type, imdb_rating, actors, created_at, updated_at, last_watched_at
 `
 
 type CreateMediaParams struct {
@@ -79,12 +79,13 @@ func (q *Queries) CreateMedia(ctx context.Context, arg CreateMediaParams) (Mediu
 		&i.Actors,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LastWatchedAt,
 	)
 	return i, err
 }
 
 const getMediaByID = `-- name: GetMediaByID :one
-SELECT media_id, external_id, provider, title, description, creator, date, thumbnail_url, duration_seconds, download_status, local_path, public_url, file_size, mime_type, imdb_rating, actors, created_at, updated_at FROM media WHERE media_id = $1
+SELECT media_id, external_id, provider, title, description, creator, date, thumbnail_url, duration_seconds, download_status, local_path, public_url, file_size, mime_type, imdb_rating, actors, created_at, updated_at, last_watched_at FROM media WHERE media_id = $1
 `
 
 func (q *Queries) GetMediaByID(ctx context.Context, mediaID pgtype.UUID) (Medium, error) {
@@ -109,8 +110,90 @@ func (q *Queries) GetMediaByID(ctx context.Context, mediaID pgtype.UUID) (Medium
 		&i.Actors,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LastWatchedAt,
 	)
 	return i, err
+}
+
+const listExpiredMedia = `-- name: ListExpiredMedia :many
+SELECT media_id, external_id, provider, title, description, creator, date, thumbnail_url, duration_seconds, download_status, local_path, public_url, file_size, mime_type, imdb_rating, actors, created_at, updated_at, last_watched_at FROM media
+WHERE download_status IN ('downloaded', 'downloading', 'failed')
+  AND COALESCE(last_watched_at, updated_at) < $1::timestamptz
+ORDER BY COALESCE(last_watched_at, updated_at)
+`
+
+// Downloads (or failed/partial leftovers) not watched since cutoff. Rows
+// without last_watched_at fall back to updated_at.
+func (q *Queries) ListExpiredMedia(ctx context.Context, cutoff pgtype.Timestamptz) ([]Medium, error) {
+	rows, err := q.db.Query(ctx, listExpiredMedia, cutoff)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Medium
+	for rows.Next() {
+		var i Medium
+		if err := rows.Scan(
+			&i.MediaID,
+			&i.ExternalID,
+			&i.Provider,
+			&i.Title,
+			&i.Description,
+			&i.Creator,
+			&i.Date,
+			&i.ThumbnailUrl,
+			&i.DurationSeconds,
+			&i.DownloadStatus,
+			&i.LocalPath,
+			&i.PublicUrl,
+			&i.FileSize,
+			&i.MimeType,
+			&i.ImdbRating,
+			&i.Actors,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.LastWatchedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const resetExpiredMedia = `-- name: ResetExpiredMedia :execrows
+UPDATE media
+SET download_status = '', local_path = NULL, public_url = NULL,
+    file_size = NULL, mime_type = NULL, updated_at = now()
+WHERE media_id = $1
+  AND download_status IN ('downloaded', 'downloading', 'failed')
+  AND COALESCE(last_watched_at, updated_at) < $2::timestamptz
+`
+
+type ResetExpiredMediaParams struct {
+	MediaID pgtype.UUID
+	Cutoff  pgtype.Timestamptz
+}
+
+// Back to the never-downloaded state (the app stores ” for fresh rows), unless watched again since cutoff.
+func (q *Queries) ResetExpiredMedia(ctx context.Context, arg ResetExpiredMediaParams) (int64, error) {
+	result, err := q.db.Exec(ctx, resetExpiredMedia, arg.MediaID, arg.Cutoff)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const touchMediaWatched = `-- name: TouchMediaWatched :exec
+UPDATE media SET last_watched_at = now() WHERE media_id = $1
+`
+
+func (q *Queries) TouchMediaWatched(ctx context.Context, mediaID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, touchMediaWatched, mediaID)
+	return err
 }
 
 const updateMedia = `-- name: UpdateMedia :one
@@ -120,7 +203,7 @@ SET external_id = $2, provider = $3, title = $4, description = $5, creator = $6,
     local_path = $11, public_url = $12, file_size = $13, mime_type = $14,
     imdb_rating = $15, actors = $16, updated_at = now()
 WHERE media_id = $1
-RETURNING media_id, external_id, provider, title, description, creator, date, thumbnail_url, duration_seconds, download_status, local_path, public_url, file_size, mime_type, imdb_rating, actors, created_at, updated_at
+RETURNING media_id, external_id, provider, title, description, creator, date, thumbnail_url, duration_seconds, download_status, local_path, public_url, file_size, mime_type, imdb_rating, actors, created_at, updated_at, last_watched_at
 `
 
 type UpdateMediaParams struct {
@@ -181,6 +264,7 @@ func (q *Queries) UpdateMedia(ctx context.Context, arg UpdateMediaParams) (Mediu
 		&i.Actors,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LastWatchedAt,
 	)
 	return i, err
 }

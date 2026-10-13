@@ -109,6 +109,7 @@ func main() {
 			media.NewPublicDomainTorrents(cfg.OMDBAPIKey, log),
 		)
 		media.NewHandler(store, providers, engine, log).RegisterRoutes(api, authed, stream)
+		go engine.RunRetention(ctx, cfg.MediaRetention) // 42-18: delete unwatched downloads
 	} else {
 		log.Warn("auth and media routes disabled: they require DATABASE_URL")
 	}

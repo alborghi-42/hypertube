@@ -44,6 +44,9 @@ type MediaStream struct {
 	Status     string `json:"status"`
 	URL        string `json:"url,omitempty"`
 	Message    string `json:"message,omitempty"`
+	// Transcoded streams are converted on the fly (fragmented MP4): no
+	// byte-range seeking; reload the url with ?t=<seconds> to seek.
+	Transcoded bool `json:"transcoded"`
 }
 
 // Comment is a user comment on a media item.

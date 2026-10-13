@@ -3,6 +3,7 @@ package media
 import (
 	"context"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -26,11 +27,18 @@ type Handler struct {
 	store     *Store
 	providers Registry
 	engine    *Engine
+	tx        *Transcoder
 	log       *slog.Logger
 }
 
+// NewHandler also sets up ffmpeg conversion (42-16) and, unless one is
+// already set, the engine's PostProcess hook caching a seekable .mp4.
 func NewHandler(store *Store, providers Registry, engine *Engine, log *slog.Logger) *Handler {
-	return &Handler{store: store, providers: providers, engine: engine, log: log}
+	tx := NewTranscoderFromEnv(log)
+	if engine.PostProcess == nil {
+		engine.PostProcess = tx.CachePostProcess(engine)
+	}
+	return &Handler{store: store, providers: providers, engine: engine, tx: tx, log: log}
 }
 
 // RegisterRoutes mounts the public movie GETs on api (the /api group), the
@@ -190,8 +198,10 @@ func (h *Handler) playMedia(c *gin.Context) {
 	}
 	internalID := InternalID(externalID, name)
 	ctx := c.Request.Context()
+	transcoded := false // set from the file being served, before resp
 	resp := func(status int, state, msg string) {
 		c.JSON(status, MediaStream{
+			Transcoded: transcoded,
 			InternalID: internalID,
 			ExternalID: externalID,
 			Provider:   name,
@@ -224,6 +234,7 @@ func (h *Handler) playMedia(c *gin.Context) {
 	if h.engine.Job(internalID) == nil && m.DownloadStatus == "downloaded" {
 		if abs, ok := h.engine.AbsPath(m.LocalPath); ok {
 			if _, err := os.Stat(abs); err == nil {
+				transcoded = NeedsConversion(m.LocalPath)
 				resp(http.StatusOK, "available", "Media already downloaded")
 				return
 			}
@@ -237,6 +248,7 @@ func (h *Handler) playMedia(c *gin.Context) {
 		return
 	}
 
+	transcoded = NeedsConversion(job.RelPath)
 	timer := time.NewTimer(15 * time.Second)
 	defer timer.Stop()
 	select {
@@ -266,6 +278,14 @@ func (h *Handler) streamMedia(c *gin.Context) {
 		defer r.Close()
 		r.SetContext(c.Request.Context())
 		r.SetReadahead(8 << 20)
+		if NeedsConversion(j.RelPath) {
+			h.tx.Stream(c, "", r, func() io.ReadCloser {
+				hr := j.file.NewReader()
+				hr.SetContext(c.Request.Context())
+				return hr
+			})
+			return
+		}
 		c.Header("Content-Type", j.MimeType)
 		http.ServeContent(c.Writer, c.Request, path.Base(j.RelPath), time.Time{}, r)
 		return
@@ -290,6 +310,10 @@ func (h *Handler) streamMedia(c *gin.Context) {
 	st, err := f.Stat()
 	if err != nil || st.IsDir() {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Media not available"})
+		return
+	}
+	if NeedsConversion(abs) {
+		h.tx.Stream(c, abs, nil, nil)
 		return
 	}
 	if m.MimeType != "" {

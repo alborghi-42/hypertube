@@ -38,6 +38,14 @@ export interface MediaPlayResponse {
   status?: 'available' | 'ready' | 'downloading';
   url?: string;
   message?: string;
+  /**
+   * True when the backend converts the file on the fly (mkv, avi, ...) to fragmented MP4.
+   * Such streams are not byte-range seekable: the native scrubber only works inside the
+   * buffered part. To jump elsewhere, reload the url with `?t=<seconds>` (the new stream
+   * then starts at that offset with currentTime 0). Once the download finishes the server
+   * caches a regular .mp4 and later plays report transcoded=false (fully seekable).
+   */
+  transcoded?: boolean;
 }
 
 interface ArchiveEnvelope {

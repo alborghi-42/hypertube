@@ -1,11 +1,7 @@
 import { RenderMode, ServerRoute } from '@angular/ssr';
 
 export const serverRoutes: ServerRoute[] = [
-  // Parameterized: cannot be prerendered without getPrerenderParams.
-  { path: 'watch/:id', renderMode: RenderMode.Server },
-  { path: 'movie/:provider/:externalId', renderMode: RenderMode.Server },
-  {
-    path: '**',
-    renderMode: RenderMode.Prerender,
-  },
+  // Rendered per request: pages depend on the session, the language and route params
+  // (e.g. users/:username, movie/:provider/:externalId), so nothing is prerendered.
+  { path: '**', renderMode: RenderMode.Server },
 ];

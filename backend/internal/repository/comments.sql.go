@@ -11,6 +11,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countCommentsByMedia = `-- name: CountCommentsByMedia :one
+SELECT count(*) FROM media_comments WHERE media_id = $1
+`
+
+func (q *Queries) CountCommentsByMedia(ctx context.Context, mediaID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countCommentsByMedia, mediaID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createComment = `-- name: CreateComment :one
 INSERT INTO media_comments (comment_id, media_id, user_id, content)
 VALUES ($1, $2, $3, $4)
@@ -120,6 +131,52 @@ func (q *Queries) ListCommentsByMedia(ctx context.Context, mediaID pgtype.UUID) 
 	var items []ListCommentsByMediaRow
 	for rows.Next() {
 		var i ListCommentsByMediaRow
+		if err := rows.Scan(
+			&i.CommentID,
+			&i.MediaID,
+			&i.UserID,
+			&i.Content,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Username,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listLatestComments = `-- name: ListLatestComments :many
+SELECT c.comment_id, c.media_id, c.user_id, c.content, c.created_at, c.updated_at, u.username
+FROM media_comments c
+JOIN users u ON u.id = c.user_id
+ORDER BY c.created_at DESC
+LIMIT $1
+`
+
+type ListLatestCommentsRow struct {
+	CommentID pgtype.UUID
+	MediaID   pgtype.UUID
+	UserID    pgtype.UUID
+	Content   string
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+	Username  string
+}
+
+func (q *Queries) ListLatestComments(ctx context.Context, limit int32) ([]ListLatestCommentsRow, error) {
+	rows, err := q.db.Query(ctx, listLatestComments, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListLatestCommentsRow
+	for rows.Next() {
+		var i ListLatestCommentsRow
 		if err := rows.Scan(
 			&i.CommentID,
 			&i.MediaID,

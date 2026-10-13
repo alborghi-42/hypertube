@@ -1,0 +1,450 @@
+openapi: 3.0.3
+info:
+  title: Hypertube public REST API
+  version: "1.0.0"
+  description: |
+    RESTful API required by the Hypertube subject (section III.4).
+
+    Authentication is OAuth2 **client credentials**: a logged-in user creates
+    an API client in the web app (`POST /api/auth/clients`, session cookie +
+    CSRF header), receives `client_id` + `client_secret` once, and exchanges
+    them at `POST /api/v1/oauth/token` for a bearer token (1 hour). Every
+    token acts on behalf of the user who owns the client.
+
+    The API is mounted at `/api/v1` (below `BASE_PATH`, e.g. `/hypertube`)
+    because every non-`/api` path is served by the Angular app, which already
+    owns `/users/:username` and `/oauth/complete`. Unknown paths answer 404
+    and unsupported methods 405 (with an `Allow` header), always as JSON.
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local
+  - url: https://42.bombatomica64.dev/hypertube/api/v1
+    description: Portal deployment (BASE_PATH=/hypertube)
+security:
+  - bearer: []
+tags:
+  - name: oauth
+  - name: users
+  - name: movies
+  - name: comments
+  - name: clients
+paths:
+  /oauth/token:
+    post:
+      tags: [oauth]
+      summary: Exchange client credentials for a bearer token
+      security: []
+      description: |
+        RFC 6749 section 4.4. Credentials may be sent with HTTP Basic auth or
+        in the body; the body may be `application/x-www-form-urlencoded` or JSON.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema: { $ref: "#/components/schemas/TokenRequest" }
+          application/json:
+            schema: { $ref: "#/components/schemas/TokenRequest" }
+      responses:
+        "200":
+          description: Token issued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Token" }
+        "400":
+          description: invalid_request / unsupported_grant_type
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OAuthError" }
+        "401":
+          description: invalid_client (unknown client or wrong secret)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OAuthError" }
+  /users:
+    get:
+      tags: [users]
+      summary: List users (id and username)
+      responses:
+        "200":
+          description: Users
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/UserListItem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /users/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [users]
+      summary: Get a user (email only for the profile owner)
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [users]
+      summary: Update your own profile
+      description: Partial update; omitted fields keep their value. Any other user's id answers 403.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UserPatch" }
+      responses:
+        "200":
+          description: Updated profile (with email)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Username or email already in use
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ValidationError" }
+  /movies:
+    get:
+      tags: [movies]
+      summary: Front page (popular movies), id and name
+      security: [{}, { bearer: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, maximum: 1000, default: 1 } }
+        - { name: rows, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 }, description: Rows per provider }
+      responses:
+        "200":
+          description: Movies
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MovieListItem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "502":
+          description: Every provider failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /movies/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [movies]
+      summary: Movie details collected so far
+      responses:
+        "200":
+          description: Movie
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Movie" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /movies/{id}/comments:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [comments]
+      summary: Comments on a movie, newest first
+      responses:
+        "200":
+          description: Comments
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Comment" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [comments]
+      summary: Comment on a movie
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [comment]
+              properties:
+                comment: { type: string, maxLength: 1000 }
+      responses:
+        "201": { $ref: "#/components/responses/CommentCreated" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /comments:
+    get:
+      tags: [comments]
+      summary: Latest 50 comments across all movies
+      responses:
+        "200":
+          description: Comments
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Comment" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [comments]
+      summary: Post a comment (author is the token's user)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [comment, movie_id]
+              properties:
+                comment: { type: string, maxLength: 1000 }
+                movie_id: { type: string, format: uuid }
+      responses:
+        "201": { $ref: "#/components/responses/CommentCreated" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /comments/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [comments]
+      summary: Get a comment
+      responses:
+        "200":
+          description: Comment
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Comment" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [comments]
+      summary: Edit your own comment
+      description: "`username` is accepted (subject payload) but ignored: the author never changes."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [comment]
+              properties:
+                comment: { type: string, maxLength: 1000 }
+                username: { type: string }
+      responses:
+        "200":
+          description: Updated comment
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Comment" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [comments]
+      summary: Delete your own comment
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  # Client management lives on the session API (/api), not under /api/v1.
+  /auth/clients:
+    description: Session API (cookie + X-XSRF-TOKEN header), not bearer.
+    servers:
+      - url: http://localhost:8080/api
+      - url: https://42.bombatomica64.dev/hypertube/api
+    get:
+      tags: [clients]
+      summary: List your API clients (no secrets)
+      security: [{ session: [] }]
+      responses:
+        "200":
+          description: Clients
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Client" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [clients]
+      summary: Create an API client; the secret is returned only here
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 50 }
+      responses:
+        "201":
+          description: Client created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Client" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { description: Missing or wrong CSRF header }
+  /auth/clients/{id}:
+    servers:
+      - url: http://localhost:8080/api
+      - url: https://42.bombatomica64.dev/hypertube/api
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    delete:
+      tags: [clients]
+      summary: Revoke a client and every token issued to it
+      security: [{ session: [] }]
+      responses:
+        "204": { description: Revoked }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+components:
+  securitySchemes:
+    bearer:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: /api/v1/oauth/token
+          scopes: {}
+    session:
+      type: apiKey
+      in: cookie
+      name: ht_session
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    BadRequest:
+      description: Invalid parameter or body
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ValidationError" }
+    Unauthorized:
+      description: Missing, invalid or expired bearer token
+      headers:
+        WWW-Authenticate: { schema: { type: string }, description: 'Bearer realm="hypertube"' }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: The resource belongs to another user
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: No such resource
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    CommentCreated:
+      description: Comment created
+      headers:
+        Location: { schema: { type: string }, description: URL of the new comment }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Comment" }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+    ValidationError:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, example: Validation failed }
+        fields:
+          type: object
+          additionalProperties: { type: string }
+    OAuthError:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, enum: [invalid_request, invalid_client, unsupported_grant_type, server_error] }
+        error_description: { type: string }
+    TokenRequest:
+      type: object
+      required: [grant_type]
+      properties:
+        grant_type: { type: string, enum: [client_credentials] }
+        client_id: { type: string, format: uuid }
+        client_secret: { type: string }
+    Token:
+      type: object
+      properties:
+        access_token: { type: string }
+        token_type: { type: string, example: Bearer }
+        expires_in: { type: integer, example: 3600 }
+    Client:
+      type: object
+      properties:
+        client_id: { type: string, format: uuid }
+        name: { type: string }
+        created_at: { type: string, format: date-time }
+        client_secret: { type: string, description: Only in the 201 response }
+    UserListItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        username: { type: string }
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        username: { type: string }
+        avatar_url: { type: string, nullable: true }
+        email: { type: string, format: email, description: Only for the profile owner }
+    UserPatch:
+      type: object
+      properties:
+        username: { type: string, minLength: 3, maxLength: 30 }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8, maxLength: 128, description: At least one letter and one digit }
+        avatar_url: { type: string, description: 'Absolute http(s) URL, or "" to remove' }
+    MovieListItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+    Movie:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        imdb_rating: { type: number, nullable: true }
+        production_year: { type: integer, nullable: true }
+        length: { type: integer, nullable: true, description: Seconds }
+        subtitles: { type: array, items: { type: string }, description: Available subtitle languages }
+        comments_count: { type: integer }
+    Comment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        comment: { type: string }
+        username: { type: string }
+        movie_id: { type: string, format: uuid }
+        date: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }

@@ -23,6 +23,7 @@ import (
 	"github.com/alborghi-42/hypertube/backend/internal/config"
 	"github.com/alborghi-42/hypertube/backend/internal/mail"
 	"github.com/alborghi-42/hypertube/backend/internal/media"
+	"github.com/alborghi-42/hypertube/backend/internal/publicapi"
 )
 
 // Hypertube entrypoint. The Go server is the single public process (PID 1 in
@@ -82,7 +83,8 @@ func main() {
 		stream := router.Group("/stream", sessions.Require())
 
 		auth.NewHandler(pool, sessions, log).RegisterRoutes(api, authed)
-		auth.NewProfileHandler(pool, cfg.DataDir, log).RegisterRoutes(api, authed)
+		profiles := auth.NewProfileHandler(pool, cfg.DataDir, log)
+		profiles.RegisterRoutes(api, authed)
 		auth.NewOAuth(pool, sessions, cookies, cfg.BasePath, cfg.OAuth, log).RegisterRoutes(api)
 		mailer := mail.New(mail.Config{Host: cfg.SMTPHost, Port: cfg.SMTPPort, User: cfg.SMTPUser, Password: cfg.SMTPPassword, From: cfg.SMTPFrom}, log)
 		auth.NewResetHandler(pool, sessions, mailer, cfg.OAuth.PublicURL, cfg.BasePath, log).RegisterRoutes(api)
@@ -110,6 +112,9 @@ func main() {
 		)
 		media.NewHandler(store, providers, engine, log).RegisterRoutes(api, authed, stream)
 		go engine.RunRetention(ctx, cfg.MediaRetention) // 42-18: delete unwatched downloads
+		// Public REST API (subject III.4): OAuth2 bearer tokens on /api/v1,
+		// outside the cookie CSRF group; clients are managed on /api/auth/clients.
+		publicapi.New(pool, cfg.BasePath, profiles, store, providers, log).RegisterRoutes(router, authed)
 	} else {
 		log.Warn("auth and media routes disabled: they require DATABASE_URL")
 	}

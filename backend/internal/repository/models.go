@@ -8,6 +8,21 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type ApiClient struct {
+	ID         pgtype.UUID
+	UserID     pgtype.UUID
+	Name       string
+	SecretHash []byte
+	CreatedAt  pgtype.Timestamptz
+}
+
+type ApiToken struct {
+	TokenHash []byte
+	ClientID  pgtype.UUID
+	ExpiresAt pgtype.Timestamptz
+	CreatedAt pgtype.Timestamptz
+}
+
 type MediaComment struct {
 	CommentID pgtype.UUID
 	MediaID   pgtype.UUID

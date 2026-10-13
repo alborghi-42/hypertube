@@ -26,3 +26,13 @@ RETURNING *;
 
 -- name: DeleteComment :execrows
 DELETE FROM media_comments WHERE comment_id = $1 AND media_id = $2 AND user_id = $3;
+
+-- name: ListLatestComments :many
+SELECT c.comment_id, c.media_id, c.user_id, c.content, c.created_at, c.updated_at, u.username
+FROM media_comments c
+JOIN users u ON u.id = c.user_id
+ORDER BY c.created_at DESC
+LIMIT $1;
+
+-- name: CountCommentsByMedia :one
+SELECT count(*) FROM media_comments WHERE media_id = $1;

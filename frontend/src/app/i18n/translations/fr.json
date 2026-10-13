@@ -1,0 +1,194 @@
+{
+  "common": {
+    "loading": "Chargement...",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "saving": "Enregistrement...",
+    "retry": "Réessayer",
+    "close": "Fermer",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "or": "ou"
+  },
+  "header": {
+    "brandLabel": "Bibliothèque Hypertube",
+    "nav": "Principale",
+    "language": "Langue",
+    "profileOf": "Profil de {{username}}",
+    "logout": "Se déconnecter",
+    "login": "Se connecter",
+    "signup": "S'inscrire"
+  },
+  "footer": {
+    "project": "Projet 42 · {{year}}"
+  },
+  "fields": {
+    "email": "E-mail",
+    "username": "Nom d'utilisateur",
+    "password": "Mot de passe",
+    "firstName": "Prénom",
+    "lastName": "Nom",
+    "newPassword": "Nouveau mot de passe",
+    "confirmPassword": "Confirmer le mot de passe",
+    "language": "Langue préférée",
+    "passwordHint": "Au moins 8 caractères, avec une lettre et un chiffre."
+  },
+  "validation": {
+    "required": "Ce champ est obligatoire",
+    "email": "Saisissez une adresse e-mail valide",
+    "minlength": "Au moins {{length}} caractères",
+    "maxlength": "Au plus {{length}} caractères",
+    "pattern": "Format invalide",
+    "invalid": "Valeur invalide",
+    "mismatch": "Les mots de passe ne correspondent pas"
+  },
+  "errors": {
+    "tooManyAttempts": "Trop de tentatives échouées. Patientez quelques minutes puis réessayez.",
+    "tooManyResets": "Trop de demandes de réinitialisation. Patientez un moment puis réessayez.",
+    "loginFailed": "Échec de la connexion, veuillez réessayer",
+    "registerFailed": "Échec de l'inscription, veuillez réessayer",
+    "signupFailed": "Échec de l'inscription, veuillez réessayer",
+    "requestFailed": "La demande a échoué, veuillez réessayer",
+    "resetFailed": "Échec de la réinitialisation du mot de passe, veuillez réessayer",
+    "noPendingSignup": "Aucune inscription en attente, veuillez vous reconnecter",
+    "profileSaveFailed": "Impossible d'enregistrer votre profil, veuillez réessayer",
+    "uploadFailed": "Échec de l'envoi, veuillez réessayer",
+    "avatarType": "Choisissez une image JPEG, PNG, WebP ou GIF",
+    "avatarSize": "L'image ne doit pas dépasser 5 Mo"
+  },
+  "oauth": {
+    "with42": "Se connecter avec 42",
+    "withGithub": "Se connecter avec GitHub",
+    "errors": {
+      "denied": "La connexion a été annulée.",
+      "state": "Le lien de connexion a expiré, veuillez réessayer.",
+      "email": "Votre compte n'a pas d'adresse e-mail vérifiée, il ne peut donc pas servir à se connecter.",
+      "unavailable": "Ce mode de connexion n'est pas disponible pour le moment.",
+      "generic": "Échec de la connexion, veuillez réessayer."
+    }
+  },
+  "login": {
+    "title": "Connexion",
+    "forgot": "Mot de passe oublié ?",
+    "submit": "Se connecter",
+    "submitting": "Connexion...",
+    "noAccount": "Pas encore de compte ?",
+    "createOne": "Créez-en un"
+  },
+  "register": {
+    "title": "Créer un compte",
+    "submit": "Créer le compte",
+    "submitting": "Création du compte...",
+    "already": "Déjà inscrit ?",
+    "login": "Se connecter"
+  },
+  "completeProfile": {
+    "title": "Complétez votre profil",
+    "signingUp": "Inscription avec {{provider}} en tant que",
+    "backToLogin": "Retour à la connexion"
+  },
+  "forgot": {
+    "sentTitle": "Consultez votre boîte de réception",
+    "sentBody": "Si un compte existe pour {{email}}, nous lui avons envoyé un lien pour réinitialiser le mot de passe. Le lien expire dans une heure.",
+    "backToLogin": "Retour à la connexion",
+    "title": "Mot de passe oublié",
+    "intro": "Saisissez l'e-mail de votre compte et nous vous enverrons un lien de réinitialisation.",
+    "submit": "Envoyer le lien",
+    "submitting": "Envoi...",
+    "remembered": "Vous vous en souvenez ?",
+    "login": "Se connecter"
+  },
+  "reset": {
+    "doneTitle": "Mot de passe modifié",
+    "doneBody": "Votre mot de passe a été mis à jour et toutes les sessions ont été déconnectées.",
+    "loginWithNew": "Connectez-vous avec votre nouveau mot de passe",
+    "invalidTitle": "Lien invalide",
+    "invalidBody": "Ce lien de réinitialisation est incomplet.",
+    "requestNew": "Demandez-en un nouveau",
+    "title": "Choisissez un nouveau mot de passe",
+    "requestNewLink": "Demander un nouveau lien",
+    "submit": "Définir le mot de passe"
+  },
+  "profile": {
+    "title": "Votre profil",
+    "pictureAlt": "Votre photo de profil",
+    "uploading": "Envoi...",
+    "savePicture": "Enregistrer la photo",
+    "changePicture": "Changer de photo",
+    "pictureHint": "JPEG, PNG, WebP ou GIF, jusqu'à 5 Mo.",
+    "publicLink": "Les autres voient votre profil à l'adresse",
+    "emailHint": "Vous seul pouvez voir votre e-mail.",
+    "saved": "Profil enregistré.",
+    "saveChanges": "Enregistrer les modifications",
+    "discard": "Annuler les modifications"
+  },
+  "userProfile": {
+    "loading": "Chargement du profil...",
+    "notFoundTitle": "Utilisateur introuvable",
+    "notFoundBody": "Aucun utilisateur ne s'appelle « {{username}} ».",
+    "loadFailed": "Impossible de charger ce profil.",
+    "pictureAlt": "Photo de profil de {{username}}",
+    "isYou": "C'est vous.",
+    "edit": "Modifier votre profil"
+  },
+  "browse": {
+    "statusLine": "Hypertube // Fil vidéo",
+    "title": "Découvrir, chercher, regarder",
+    "subtitle": "Des films libres de droits de l'Internet Archive, diffusés pendant que le serveur les télécharge.",
+    "searchRegion": "Recherche Hypertube",
+    "searchLabel": "Rechercher des vidéos",
+    "searchPlaceholder": "Rechercher sur Hypertube",
+    "searchAria": "Rechercher des vidéos Hypertube",
+    "categories": "Catégories de vidéos",
+    "allCategory": "Toutes",
+    "archiveCategory": "Archive",
+    "loadingTitle": "Chargement du fil...",
+    "loadingBody": "Récupération du dernier catalogue de l'Internet Archive.",
+    "errorTitle": "Impossible de charger le fil",
+    "errorBody": "L'API média n'a pas répondu correctement.",
+    "results": "Résultats vidéo",
+    "videoAria": "Vidéo {{title}} par {{channel}}",
+    "videoDetails": "Détails de la vidéo",
+    "emptyTitle": "Aucune vidéo trouvée",
+    "emptyBody": "Essayez un terme plus large ou revenez à la catégorie Toutes.",
+    "loadingMoreAria": "Chargement d'autres vidéos",
+    "loadingMore": "Chargement...",
+    "nextPageFailed": "Impossible de charger la page suivante.",
+    "endOfFeed": "// fin du fil",
+    "streaming": "Lecture de {{title}}",
+    "closePlayer": "Fermer le lecteur vidéo",
+    "streamErrorTitle": "Impossible de charger le flux",
+    "streamErrorBody": "Le serveur n'a pas pu fournir d'URL de flux pour cette vidéo.",
+    "playerLoadingAria": "Chargement du lecteur vidéo",
+    "playerLoading": "Chargement du lecteur vidéo...",
+    "mediaDetails": "Détails du média",
+    "openArchive": "Ouvrir sur Archive.org",
+    "detailsLoading": "Chargement des détails...",
+    "detailsFailed": "Impossible de charger les détails du média.",
+    "extendedMetadata": "Métadonnées détaillées",
+    "unknownDate": "Date inconnue",
+    "unknownDuration": "Durée inconnue"
+  },
+  "comments": {
+    "title": "Commentaires",
+    "write": "Écrire un commentaire",
+    "post": "Publier",
+    "loading": "Chargement des commentaires...",
+    "loadFailed": "Impossible de charger les commentaires.",
+    "edited": "(modifié)",
+    "editLabel": "Modifier le commentaire",
+    "empty": "Aucun commentaire pour l'instant.",
+    "postFailed": "Impossible de publier votre commentaire.",
+    "saveFailed": "Impossible d'enregistrer vos modifications.",
+    "deleteFailed": "Impossible de supprimer le commentaire."
+  },
+  "titles": {
+    "profile": "Votre profil",
+    "userProfile": "Profil",
+    "login": "Connexion",
+    "register": "Inscription",
+    "completeProfile": "Complétez votre profil",
+    "forgotPassword": "Mot de passe oublié",
+    "resetPassword": "Réinitialiser le mot de passe"
+  }
+}

@@ -1,0 +1,194 @@
+{
+  "common": {
+    "loading": "Caricamento...",
+    "cancel": "Annulla",
+    "save": "Salva",
+    "saving": "Salvataggio...",
+    "retry": "Riprova",
+    "close": "Chiudi",
+    "edit": "Modifica",
+    "delete": "Elimina",
+    "or": "oppure"
+  },
+  "header": {
+    "brandLabel": "Libreria Hypertube",
+    "nav": "Principale",
+    "language": "Lingua",
+    "profileOf": "Profilo di {{username}}",
+    "logout": "Esci",
+    "login": "Accedi",
+    "signup": "Registrati"
+  },
+  "footer": {
+    "project": "Progetto 42 · {{year}}"
+  },
+  "fields": {
+    "email": "Email",
+    "username": "Nome utente",
+    "password": "Password",
+    "firstName": "Nome",
+    "lastName": "Cognome",
+    "newPassword": "Nuova password",
+    "confirmPassword": "Conferma password",
+    "language": "Lingua preferita",
+    "passwordHint": "Almeno 8 caratteri, con una lettera e una cifra."
+  },
+  "validation": {
+    "required": "Campo obbligatorio",
+    "email": "Inserisci un indirizzo email valido",
+    "minlength": "Almeno {{length}} caratteri",
+    "maxlength": "Al massimo {{length}} caratteri",
+    "pattern": "Formato non valido",
+    "invalid": "Valore non valido",
+    "mismatch": "Le password non coincidono"
+  },
+  "errors": {
+    "tooManyAttempts": "Troppi tentativi falliti. Attendi qualche minuto e riprova.",
+    "tooManyResets": "Troppe richieste di reimpostazione. Attendi un po' e riprova.",
+    "loginFailed": "Accesso non riuscito, riprova",
+    "registerFailed": "Registrazione non riuscita, riprova",
+    "signupFailed": "Registrazione non riuscita, riprova",
+    "requestFailed": "Richiesta non riuscita, riprova",
+    "resetFailed": "Reimpostazione della password non riuscita, riprova",
+    "noPendingSignup": "Nessuna registrazione in sospeso, accedi di nuovo",
+    "profileSaveFailed": "Impossibile salvare il profilo, riprova",
+    "uploadFailed": "Caricamento non riuscito, riprova",
+    "avatarType": "Scegli un'immagine JPEG, PNG, WebP o GIF",
+    "avatarSize": "L'immagine deve essere al massimo di 5 MB"
+  },
+  "oauth": {
+    "with42": "Accedi con 42",
+    "withGithub": "Accedi con GitHub",
+    "errors": {
+      "denied": "L'accesso è stato annullato.",
+      "state": "Il link di accesso è scaduto, riprova.",
+      "email": "Il tuo account non ha un indirizzo email verificato, quindi non può essere usato per accedere.",
+      "unavailable": "Questo metodo di accesso non è disponibile al momento.",
+      "generic": "Accesso non riuscito, riprova."
+    }
+  },
+  "login": {
+    "title": "Accedi",
+    "forgot": "Password dimenticata?",
+    "submit": "Accedi",
+    "submitting": "Accesso in corso...",
+    "noAccount": "Non hai ancora un account?",
+    "createOne": "Creane uno"
+  },
+  "register": {
+    "title": "Crea un account",
+    "submit": "Crea account",
+    "submitting": "Creazione account...",
+    "already": "Sei già registrato?",
+    "login": "Accedi"
+  },
+  "completeProfile": {
+    "title": "Completa il tuo profilo",
+    "signingUp": "Registrazione con {{provider}} come",
+    "backToLogin": "Torna all'accesso"
+  },
+  "forgot": {
+    "sentTitle": "Controlla la posta",
+    "sentBody": "Se esiste un account per {{email}}, gli abbiamo inviato un link per reimpostare la password. Il link scade tra un'ora.",
+    "backToLogin": "Torna all'accesso",
+    "title": "Password dimenticata",
+    "intro": "Inserisci l'email del tuo account e ti invieremo un link di reimpostazione.",
+    "submit": "Invia link",
+    "submitting": "Invio in corso...",
+    "remembered": "Te la sei ricordata?",
+    "login": "Accedi"
+  },
+  "reset": {
+    "doneTitle": "Password modificata",
+    "doneBody": "La password è stata aggiornata e tutte le sessioni sono state chiuse.",
+    "loginWithNew": "Accedi con la nuova password",
+    "invalidTitle": "Link non valido",
+    "invalidBody": "Questo link di reimpostazione è incompleto.",
+    "requestNew": "Richiedine uno nuovo",
+    "title": "Scegli una nuova password",
+    "requestNewLink": "Richiedi un nuovo link",
+    "submit": "Imposta la nuova password"
+  },
+  "profile": {
+    "title": "Il tuo profilo",
+    "pictureAlt": "La tua immagine del profilo",
+    "uploading": "Caricamento...",
+    "savePicture": "Salva immagine",
+    "changePicture": "Cambia immagine",
+    "pictureHint": "JPEG, PNG, WebP o GIF, fino a 5 MB.",
+    "publicLink": "Gli altri vedono il tuo profilo su",
+    "emailHint": "Solo tu puoi vedere la tua email.",
+    "saved": "Profilo salvato.",
+    "saveChanges": "Salva modifiche",
+    "discard": "Annulla modifiche"
+  },
+  "userProfile": {
+    "loading": "Caricamento profilo...",
+    "notFoundTitle": "Utente non trovato",
+    "notFoundBody": "Nessun utente si chiama \"{{username}}\".",
+    "loadFailed": "Impossibile caricare questo profilo.",
+    "pictureAlt": "Immagine del profilo di {{username}}",
+    "isYou": "Questo sei tu.",
+    "edit": "Modifica il tuo profilo"
+  },
+  "browse": {
+    "statusLine": "Hypertube // Feed video",
+    "title": "Scopri, cerca, guarda",
+    "subtitle": "Film legali dall'Internet Archive, in streaming mentre il server li scarica.",
+    "searchRegion": "Ricerca Hypertube",
+    "searchLabel": "Cerca video",
+    "searchPlaceholder": "Cerca su Hypertube",
+    "searchAria": "Cerca video su Hypertube",
+    "categories": "Categorie video",
+    "allCategory": "Tutti",
+    "archiveCategory": "Archivio",
+    "loadingTitle": "Caricamento feed...",
+    "loadingBody": "Recupero dell'ultimo catalogo dall'Internet Archive.",
+    "errorTitle": "Impossibile caricare il feed",
+    "errorBody": "L'API dei media non ha risposto correttamente.",
+    "results": "Risultati video",
+    "videoAria": "Video {{title}} di {{channel}}",
+    "videoDetails": "Dettagli video",
+    "emptyTitle": "Nessun video trovato",
+    "emptyBody": "Prova un termine di ricerca più ampio o torna alla categoria Tutti.",
+    "loadingMoreAria": "Caricamento di altri video",
+    "loadingMore": "Caricamento...",
+    "nextPageFailed": "Impossibile caricare la pagina successiva.",
+    "endOfFeed": "// fine del feed",
+    "streaming": "In riproduzione: {{title}}",
+    "closePlayer": "Chiudi il lettore video",
+    "streamErrorTitle": "Impossibile caricare lo stream",
+    "streamErrorBody": "Il server non ha potuto fornire un URL di streaming per questo video.",
+    "playerLoadingAria": "Caricamento lettore video",
+    "playerLoading": "Caricamento lettore video...",
+    "mediaDetails": "Dettagli del media",
+    "openArchive": "Apri su Archive.org",
+    "detailsLoading": "Caricamento dettagli...",
+    "detailsFailed": "Impossibile caricare i dettagli del media.",
+    "extendedMetadata": "Metadati estesi",
+    "unknownDate": "Data sconosciuta",
+    "unknownDuration": "Durata sconosciuta"
+  },
+  "comments": {
+    "title": "Commenti",
+    "write": "Scrivi un commento",
+    "post": "Pubblica",
+    "loading": "Caricamento commenti...",
+    "loadFailed": "Impossibile caricare i commenti.",
+    "edited": "(modificato)",
+    "editLabel": "Modifica commento",
+    "empty": "Ancora nessun commento.",
+    "postFailed": "Impossibile pubblicare il commento.",
+    "saveFailed": "Impossibile salvare le modifiche.",
+    "deleteFailed": "Impossibile eliminare il commento."
+  },
+  "titles": {
+    "profile": "Il tuo profilo",
+    "userProfile": "Profilo",
+    "login": "Accedi",
+    "register": "Registrati",
+    "completeProfile": "Completa il tuo profilo",
+    "forgotPassword": "Password dimenticata",
+    "resetPassword": "Reimposta password"
+  }
+}

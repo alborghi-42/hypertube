@@ -1,0 +1,194 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving...",
+    "retry": "Retry",
+    "close": "Close",
+    "edit": "Edit",
+    "delete": "Delete",
+    "or": "or"
+  },
+  "header": {
+    "brandLabel": "Hypertube library",
+    "nav": "Main",
+    "language": "Language",
+    "profileOf": "Profile of {{username}}",
+    "logout": "Log out",
+    "login": "Log in",
+    "signup": "Sign up"
+  },
+  "footer": {
+    "project": "42 project · {{year}}"
+  },
+  "fields": {
+    "email": "Email",
+    "username": "Username",
+    "password": "Password",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm password",
+    "language": "Preferred language",
+    "passwordHint": "At least 8 characters, with a letter and a digit."
+  },
+  "validation": {
+    "required": "This field is required",
+    "email": "Enter a valid email address",
+    "minlength": "Must be at least {{length}} characters",
+    "maxlength": "Must be at most {{length}} characters",
+    "pattern": "Invalid format",
+    "invalid": "Invalid value",
+    "mismatch": "Passwords do not match"
+  },
+  "errors": {
+    "tooManyAttempts": "Too many failed attempts. Please wait a few minutes and try again.",
+    "tooManyResets": "Too many reset requests. Please wait a while and try again.",
+    "loginFailed": "Login failed, please try again",
+    "registerFailed": "Registration failed, please try again",
+    "signupFailed": "Sign-up failed, please try again",
+    "requestFailed": "Request failed, please try again",
+    "resetFailed": "Password reset failed, please try again",
+    "noPendingSignup": "No pending sign-up, please log in again",
+    "profileSaveFailed": "Could not save your profile, please try again",
+    "uploadFailed": "Upload failed, please try again",
+    "avatarType": "Choose a JPEG, PNG, WebP or GIF image",
+    "avatarSize": "Image must be at most 5 MB"
+  },
+  "oauth": {
+    "with42": "Log in with 42",
+    "withGithub": "Log in with GitHub",
+    "errors": {
+      "denied": "Login was cancelled.",
+      "state": "The login link expired, please try again.",
+      "email": "Your account has no verified email address, so it cannot be used to log in.",
+      "unavailable": "This login method is not available right now.",
+      "generic": "Login failed, please try again."
+    }
+  },
+  "login": {
+    "title": "Log in",
+    "forgot": "Forgot password?",
+    "submit": "Log in",
+    "submitting": "Logging in...",
+    "noAccount": "No account yet?",
+    "createOne": "Create one"
+  },
+  "register": {
+    "title": "Create an account",
+    "submit": "Create account",
+    "submitting": "Creating account...",
+    "already": "Already registered?",
+    "login": "Log in"
+  },
+  "completeProfile": {
+    "title": "Complete your profile",
+    "signingUp": "Signing up with {{provider}} as",
+    "backToLogin": "Back to log in"
+  },
+  "forgot": {
+    "sentTitle": "Check your inbox",
+    "sentBody": "If an account exists for {{email}}, we sent it a link to reset the password. The link expires in one hour.",
+    "backToLogin": "Back to log in",
+    "title": "Forgot password",
+    "intro": "Enter your account email and we will send you a reset link.",
+    "submit": "Send reset link",
+    "submitting": "Sending...",
+    "remembered": "Remembered it?",
+    "login": "Log in"
+  },
+  "reset": {
+    "doneTitle": "Password changed",
+    "doneBody": "Your password was updated and every session was logged out.",
+    "loginWithNew": "Log in with your new password",
+    "invalidTitle": "Invalid link",
+    "invalidBody": "This reset link is incomplete.",
+    "requestNew": "Request a new one",
+    "title": "Choose a new password",
+    "requestNewLink": "Request a new link",
+    "submit": "Set new password"
+  },
+  "profile": {
+    "title": "Your profile",
+    "pictureAlt": "Your profile picture",
+    "uploading": "Uploading...",
+    "savePicture": "Save picture",
+    "changePicture": "Change picture",
+    "pictureHint": "JPEG, PNG, WebP or GIF, up to 5 MB.",
+    "publicLink": "Others see your profile at",
+    "emailHint": "Only you can see your email.",
+    "saved": "Profile saved.",
+    "saveChanges": "Save changes",
+    "discard": "Discard"
+  },
+  "userProfile": {
+    "loading": "Loading profile...",
+    "notFoundTitle": "User not found",
+    "notFoundBody": "No user is called \"{{username}}\".",
+    "loadFailed": "Could not load this profile.",
+    "pictureAlt": "{{username}}’s profile picture",
+    "isYou": "This is you.",
+    "edit": "Edit your profile"
+  },
+  "browse": {
+    "statusLine": "Hypertube // Video Feed",
+    "title": "Discover, Search, Watch",
+    "subtitle": "Legal films from the Internet Archive, streamed while the server downloads them.",
+    "searchRegion": "Hypertube search",
+    "searchLabel": "Search videos",
+    "searchPlaceholder": "Search Hypertube",
+    "searchAria": "Search Hypertube videos",
+    "categories": "Video categories",
+    "allCategory": "All",
+    "archiveCategory": "Archive",
+    "loadingTitle": "Loading media feed...",
+    "loadingBody": "Pulling the latest catalog from the Internet Archive.",
+    "errorTitle": "Could not load media feed",
+    "errorBody": "The media API did not respond correctly.",
+    "results": "Video results",
+    "videoAria": "Video titled {{title}} by {{channel}}",
+    "videoDetails": "Video details",
+    "emptyTitle": "No videos found",
+    "emptyBody": "Try a broader search term or switch back to the All category.",
+    "loadingMoreAria": "Loading more videos",
+    "loadingMore": "Loading more...",
+    "nextPageFailed": "Failed to load next page.",
+    "endOfFeed": "// end of feed",
+    "streaming": "Streaming {{title}}",
+    "closePlayer": "Close video player",
+    "streamErrorTitle": "Unable to load stream",
+    "streamErrorBody": "The server could not provide a stream URL for this video.",
+    "playerLoadingAria": "Loading video player",
+    "playerLoading": "Loading video player...",
+    "mediaDetails": "Media details",
+    "openArchive": "Open on Archive.org",
+    "detailsLoading": "Loading details...",
+    "detailsFailed": "Could not load media details.",
+    "extendedMetadata": "Extended media metadata",
+    "unknownDate": "Unknown date",
+    "unknownDuration": "Unknown duration"
+  },
+  "comments": {
+    "title": "Comments",
+    "write": "Write a comment",
+    "post": "Post",
+    "loading": "Loading comments...",
+    "loadFailed": "Could not load comments.",
+    "edited": "(edited)",
+    "editLabel": "Edit comment",
+    "empty": "No comments yet.",
+    "postFailed": "Could not post your comment.",
+    "saveFailed": "Could not save your changes.",
+    "deleteFailed": "Could not delete the comment."
+  },
+  "titles": {
+    "profile": "Your profile",
+    "userProfile": "Profile",
+    "login": "Log in",
+    "register": "Sign up",
+    "completeProfile": "Complete your profile",
+    "forgotPassword": "Forgot password",
+    "resetPassword": "Reset password"
+  }
+}

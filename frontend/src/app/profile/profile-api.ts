@@ -7,15 +7,6 @@ import type { AuthUser } from '../auth/auth.service';
 /** Relative to <base href>, like the other API clients. */
 const USERS_API = 'api/users';
 
-/** Must match supportedLanguages in backend/internal/auth/profile.go. */
-export const LANGUAGES: readonly { code: string; label: string }[] = [
-  { code: 'en', label: 'English' },
-  { code: 'fr', label: 'Français' },
-  { code: 'it', label: 'Italiano' },
-  { code: 'es', label: 'Español' },
-  { code: 'de', label: 'Deutsch' },
-];
-
 /** Must match avatarMaxBytes in backend/internal/auth/avatar.go. */
 export const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
 export const AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -51,6 +42,11 @@ export class ProfileApi {
 
   update(payload: ProfileUpdate): Promise<AuthUser> {
     return firstValueFrom(this.http.patch<AuthUser>(`${USERS_API}/me`, payload));
+  }
+
+  /** Partial update: only the preferred language (the backend keeps the other fields). */
+  updateLanguage(language: string): Promise<AuthUser> {
+    return firstValueFrom(this.http.patch<AuthUser>(`${USERS_API}/me`, { language }));
   }
 
   uploadAvatar(file: File): Promise<AuthUser> {

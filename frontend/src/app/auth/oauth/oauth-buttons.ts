@@ -1,15 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import { safeReturnUrl } from '../auth.service';
 
-const OAUTH_ERRORS: Record<string, string> = {
-  denied: 'Login was cancelled.',
-  state: 'The login link expired, please try again.',
-  email: 'Your account has no verified email address, so it cannot be used to log in.',
-  unavailable: 'This login method is not available right now.',
-};
+/** ?oauth_error codes with a dedicated message (translation keys under oauth.errors). */
+const OAUTH_ERRORS = new Set(['denied', 'state', 'email', 'unavailable']);
 
 /**
  * "Log in with 42 / GitHub". Plain links (full-page navigation) to the backend start
@@ -18,6 +15,7 @@ const OAUTH_ERRORS: Record<string, string> = {
  */
 @Component({
   selector: 'app-oauth-buttons',
+  imports: [TranslocoPipe],
   templateUrl: './oauth-buttons.html',
   styleUrl: './oauth.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -30,6 +28,6 @@ export class OAuthButtons {
   );
   readonly error = computed(() => {
     const code = this.query()?.get('oauth_error');
-    return code ? (OAUTH_ERRORS[code] ?? 'Login failed, please try again.') : null;
+    return code ? `oauth.errors.${OAUTH_ERRORS.has(code) ? code : 'generic'}` : null;
   });
 }

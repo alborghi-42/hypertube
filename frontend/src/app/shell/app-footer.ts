@@ -1,11 +1,13 @@
 import { Component } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 @Component({
   selector: 'app-footer',
+  imports: [TranslocoPipe],
   template: `
     <footer class="app-footer">
       <span>Hypertube</span>
-      <span>42 project · {{ year }}</span>
+      <span>{{ 'footer.project' | transloco: { year: year } }}</span>
     </footer>
   `,
   styles: `

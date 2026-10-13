@@ -14,9 +14,17 @@ import {
   type ElementRef,
 } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import { MediaComments } from '../media/comments/media-comments';
-import { DEFAULT_PROVIDER, MediaApi, type MediaDetails, type MediaDoc, type MediaListParams } from '../media/media-api';
+import { LanguageService } from '../shell/language.service';
+import {
+  DEFAULT_PROVIDER,
+  MediaApi,
+  type MediaDetails,
+  type MediaDoc,
+  type MediaListParams,
+} from '../media/media-api';
 
 interface Video {
   id: string;
@@ -40,7 +48,7 @@ const WATCH_PATH = /^\/watch\/([^/]+)$/;
  */
 @Component({
   selector: 'app-browse',
-  imports: [MediaComments],
+  imports: [MediaComments, TranslocoPipe],
   templateUrl: './browse.html',
   styleUrl: './browse.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -51,6 +59,7 @@ const WATCH_PATH = /^\/watch\/([^/]+)$/;
 export class Browse {
   private readonly api = inject(MediaApi);
   private readonly location = inject(Location);
+  private readonly language = inject(LanguageService);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
 
   private searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -77,7 +86,11 @@ export class Browse {
   readonly mediaResource = resource({
     params: (): MediaListParams | undefined =>
       this.isBrowser
-        ? { page: this.currentPage(), query: this.debouncedSearchQuery().trim(), rows: ROWS_PER_PAGE }
+        ? {
+            page: this.currentPage(),
+            query: this.debouncedSearchQuery().trim(),
+            rows: ROWS_PER_PAGE,
+          }
         : undefined,
     loader: async ({ params, abortSignal }) => {
       const cacheKey = cacheKeyOf(params);
@@ -108,7 +121,8 @@ export class Browse {
           channel: rawChannel.length > 0 ? rawChannel : provider,
           provider,
           published: this.formatPublishedDate(doc.date),
-          category: rawCategory.length > 0 ? rawCategory : 'Archive',
+          category:
+            rawCategory.length > 0 ? rawCategory : this.language.t('browse.archiveCategory'),
           accent: '0.71 0.17 150',
           thumbnailUrl: doc.thumbnailUrl ?? doc.thumbnail_url ?? '',
           detailsUrl: sourceUrl(provider, id),
@@ -172,7 +186,9 @@ export class Browse {
 
     // Back/forward between `/` and `/watch/:id` (URL changes made with Location.go
     // are invisible to the router, so sync the modal from the path ourselves).
-    const popstate = this.location.subscribe(({ url }) => this.syncSelectedVideoFromPath(url ?? ''));
+    const popstate = this.location.subscribe(({ url }) =>
+      this.syncSelectedVideoFromPath(url ?? ''),
+    );
     inject(DestroyRef).onDestroy(() => popstate.unsubscribe());
 
     // Accumulate docs as each page loads.
@@ -259,22 +275,27 @@ export class Browse {
   }
 
   formatPublishedDate(date: string | undefined): string {
+    const unknown = this.language.t('browse.unknownDate');
     if (date === undefined || date.trim().length === 0) {
-      return 'Unknown date';
+      return unknown;
     }
     const parsed = new Date(date);
-    return Number.isNaN(parsed.getTime()) ? 'Unknown date' : parsed.toLocaleDateString();
+    return Number.isNaN(parsed.getTime())
+      ? unknown
+      : parsed.toLocaleDateString(this.language.current());
   }
 
   formatDuration(seconds: number | undefined): string {
     if (seconds === undefined || !Number.isFinite(seconds) || seconds <= 0) {
-      return 'Unknown duration';
+      return this.language.t('browse.unknownDuration');
     }
     const total = Math.floor(seconds);
     const hours = Math.floor(total / 3600);
     const minutes = Math.floor((total % 3600) / 60);
     const secs = String(total % 60).padStart(2, '0');
-    return hours > 0 ? `${hours}:${String(minutes).padStart(2, '0')}:${secs}` : `${minutes}:${secs}`;
+    return hours > 0
+      ? `${hours}:${String(minutes).padStart(2, '0')}:${secs}`
+      : `${minutes}:${secs}`;
   }
 
   private preloadThumbnails(docs: MediaDoc[]): void {
@@ -313,7 +334,8 @@ export class Browse {
     if (this.streamUrlByVideoId()[videoId]) {
       return;
     }
-    const provider = this.videos().find((video) => video.id === videoId)?.provider ?? DEFAULT_PROVIDER;
+    const provider =
+      this.videos().find((video) => video.id === videoId)?.provider ?? DEFAULT_PROVIDER;
 
     this.streamErrorByVideoId.update((errors) => ({ ...errors, [videoId]: false }));
     const url = await this.api.play(videoId, provider);

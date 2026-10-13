@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject, resource } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { map } from 'rxjs';
 
 import { AuthService } from '../auth/auth.service';
@@ -10,7 +11,7 @@ import { ProfileApi } from './profile-api';
 /** Public profile of any user (/users/:username). Never shows the email. */
 @Component({
   selector: 'app-user-profile',
-  imports: [RouterLink],
+  imports: [RouterLink, TranslocoPipe],
   templateUrl: './user-profile.html',
   styleUrl: './profile.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

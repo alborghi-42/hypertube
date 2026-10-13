@@ -7,19 +7,29 @@ import {
   effect,
   inject,
   signal,
+  untracked,
 } from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import { AuthService, type AuthErrorBody } from '../auth/auth.service';
 import { applyServerErrors, controlError } from '../auth/form-errors';
 import { EMAIL_VALIDATORS, NAME_VALIDATORS, USERNAME_VALIDATORS } from '../auth/validation';
-import { AVATAR_MAX_BYTES, AVATAR_TYPES, LANGUAGES, ProfileApi } from './profile-api';
+import { MessagePipe, msg, type Message } from '../i18n/message';
+import { DEFAULT_LANGUAGE, isSupportedLanguage } from '../i18n/transloco';
+import { LANGUAGES } from '../shell/language.service';
+import { AVATAR_MAX_BYTES, AVATAR_TYPES, ProfileApi } from './profile-api';
+
+/** Accounts created while more languages were allowed fall back to English. */
+function supportedOrDefault(language: string): string {
+  return isSupportedLanguage(language) ? language : DEFAULT_LANGUAGE;
+}
 
 /** Own profile: edit the account fields and upload a new avatar. */
 @Component({
   selector: 'app-profile',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, TranslocoPipe, MessagePipe],
   templateUrl: './profile.html',
   styleUrl: './profile.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -37,28 +47,32 @@ export class Profile {
     username: ['', USERNAME_VALIDATORS],
     first_name: ['', NAME_VALIDATORS],
     last_name: ['', NAME_VALIDATORS],
-    language: ['en', Validators.required],
+    language: [DEFAULT_LANGUAGE as string, Validators.required],
   });
   readonly saving = signal(false);
-  readonly formError = signal<string | null>(null);
+  readonly formError = signal<Message | null>(null);
   readonly saved = signal(false);
 
   readonly avatarFile = signal<File | null>(null);
   readonly previewUrl = signal<string | null>(null);
   readonly uploading = signal(false);
-  readonly avatarError = signal<string | null>(null);
+  readonly avatarError = signal<Message | null>(null);
   readonly shownAvatar = computed(() => this.previewUrl() ?? this.user()?.avatar_url ?? null);
 
   readonly controlError = controlError;
 
   constructor() {
     // Fill the form once the user is known (the guard already loaded it in the browser).
+    // Later user changes (e.g. the header language select) only update an untouched language.
     let filled = false;
     effect(() => {
       const user = this.user();
-      if (user !== null && !filled) {
+      if (user === null) return;
+      if (!filled) {
         filled = true;
         this.resetForm();
+      } else if (untracked(() => this.form.controls.language.pristine)) {
+        this.form.controls.language.setValue(supportedOrDefault(user.language));
       }
     });
     inject(DestroyRef).onDestroy(() => this.setPreview(null));
@@ -72,7 +86,7 @@ export class Profile {
       username: user.username,
       first_name: user.first_name,
       last_name: user.last_name,
-      language: user.language,
+      language: supportedOrDefault(user.language),
     });
     this.formError.set(null);
   }
@@ -98,9 +112,7 @@ export class Profile {
       this.resetForm();
       this.saved.set(true);
     } catch (error) {
-      this.formError.set(
-        applyServerErrors(this.form, error, 'Could not save your profile, please try again'),
-      );
+      this.formError.set(applyServerErrors(this.form, error, 'errors.profileSaveFailed'));
     } finally {
       this.saving.set(false);
     }
@@ -113,11 +125,11 @@ export class Profile {
     this.avatarError.set(null);
     if (file === null) return;
     if (!AVATAR_TYPES.includes(file.type)) {
-      this.avatarError.set('Choose a JPEG, PNG, WebP or GIF image');
+      this.avatarError.set(msg('errors.avatarType'));
       return;
     }
     if (file.size > AVATAR_MAX_BYTES) {
-      this.avatarError.set('Image must be at most 5 MB');
+      this.avatarError.set(msg('errors.avatarSize'));
       return;
     }
     this.avatarFile.set(file);
@@ -140,7 +152,7 @@ export class Profile {
       this.cancelAvatar();
     } catch (error) {
       const body = error instanceof HttpErrorResponse ? ((error.error ?? {}) as AuthErrorBody) : {};
-      this.avatarError.set(body.error ?? 'Upload failed, please try again');
+      this.avatarError.set(body.error ? { text: body.error } : msg('errors.uploadFailed'));
     } finally {
       this.uploading.set(false);
     }

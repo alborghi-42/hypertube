@@ -1,8 +1,8 @@
 <header class="app-header">
-  <a class="brand" routerLink="/" aria-label="Hypertube library">Hypertube</a>
+  <a class="brand" routerLink="/" [attr.aria-label]="'header.brandLabel' | transloco">Hypertube</a>
 
-  <nav class="actions" aria-label="Main">
-    <label class="sr-only" for="app-language">Language</label>
+  <nav class="actions" [attr.aria-label]="'header.nav' | transloco">
+    <label class="sr-only" for="app-language">{{ 'header.language' | transloco }}</label>
     <select id="app-language" class="language" (change)="onLanguageChange($event)">
       @for (lang of languages; track lang.code) {
         <option
@@ -16,17 +16,23 @@
     </select>
 
     @if (user(); as current) {
-      <a class="avatar" routerLink="/profile" [attr.aria-label]="'Profile of ' + current.username">
+      <a
+        class="avatar"
+        routerLink="/profile"
+        [attr.aria-label]="'header.profileOf' | transloco: { username: current.username }"
+      >
         @if (current.avatar_url) {
           <img [src]="current.avatar_url" alt="" width="36" height="36" />
         } @else {
           <span aria-hidden="true">{{ initials() }}</span>
         }
       </a>
-      <button type="button" class="button" (click)="logout()">Log out</button>
+      <button type="button" class="button" (click)="logout()">
+        {{ 'header.logout' | transloco }}
+      </button>
     } @else {
-      <a class="link" routerLink="/login">Log in</a>
-      <a class="button" routerLink="/register">Sign up</a>
+      <a class="link" routerLink="/login">{{ 'header.login' | transloco }}</a>
+      <a class="button" routerLink="/register">{{ 'header.signup' | transloco }}</a>
     }
   </nav>
 </header>

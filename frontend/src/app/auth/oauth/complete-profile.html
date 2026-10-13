@@ -1,63 +1,66 @@
 <form class="auth-card" [formGroup]="form" (ngSubmit)="submit()" novalidate>
-  <h1>Complete your profile</h1>
+  <h1>{{ 'completeProfile.title' | transloco }}</h1>
 
   @if (loading()) {
-    <p class="switch">Loading...</p>
+    <p class="switch">{{ 'common.loading' | transloco }}</p>
   } @else if (pending(); as p) {
     <p class="switch">
-      Signing up with {{ providerLabel(p.provider) }} as <strong>{{ p.email }}</strong
+      {{ 'completeProfile.signingUp' | transloco: { provider: providerLabel(p.provider) } }}
+      <strong>{{ p.email }}</strong
       >.
     </p>
 
     <label class="field">
-      Username
+      {{ 'fields.username' | transloco }}
       <input
         type="text"
         formControlName="username"
         autocomplete="username"
-        [attr.aria-invalid]="controlError(form.controls.username, 'Username') !== null"
+        [attr.aria-invalid]="controlError(form.controls.username) !== null"
       />
-      @if (controlError(form.controls.username, 'Username'); as message) {
-        <p class="field-error">{{ message }}</p>
+      @if (controlError(form.controls.username); as message) {
+        <p class="field-error">{{ message | message }}</p>
       }
     </label>
 
     <label class="field">
-      First name
+      {{ 'fields.firstName' | transloco }}
       <input
         type="text"
         formControlName="first_name"
         autocomplete="given-name"
-        [attr.aria-invalid]="controlError(form.controls.first_name, 'First name') !== null"
+        [attr.aria-invalid]="controlError(form.controls.first_name) !== null"
       />
-      @if (controlError(form.controls.first_name, 'First name'); as message) {
-        <p class="field-error">{{ message }}</p>
+      @if (controlError(form.controls.first_name); as message) {
+        <p class="field-error">{{ message | message }}</p>
       }
     </label>
 
     <label class="field">
-      Last name
+      {{ 'fields.lastName' | transloco }}
       <input
         type="text"
         formControlName="last_name"
         autocomplete="family-name"
-        [attr.aria-invalid]="controlError(form.controls.last_name, 'Last name') !== null"
+        [attr.aria-invalid]="controlError(form.controls.last_name) !== null"
       />
-      @if (controlError(form.controls.last_name, 'Last name'); as message) {
-        <p class="field-error">{{ message }}</p>
+      @if (controlError(form.controls.last_name); as message) {
+        <p class="field-error">{{ message | message }}</p>
       }
     </label>
   }
 
   @if (formError(); as message) {
-    <p class="form-error" role="alert">{{ message }}</p>
+    <p class="form-error" role="alert">{{ message | message }}</p>
   }
 
   @if (pending()) {
     <button type="submit" [disabled]="submitting()">
-      {{ submitting() ? 'Creating account...' : 'Create account' }}
+      {{ (submitting() ? 'register.submitting' : 'register.submit') | transloco }}
     </button>
   }
 
-  <p class="switch"><a routerLink="/login">Back to log in</a></p>
+  <p class="switch">
+    <a routerLink="/login">{{ 'completeProfile.backToLogin' | transloco }}</a>
+  </p>
 </form>

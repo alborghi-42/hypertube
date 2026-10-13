@@ -1,12 +1,12 @@
-<section class="comments" aria-label="Comments">
-  <h3>Comments</h3>
+<section class="comments" [attr.aria-label]="'comments.title' | transloco">
+  <h3>{{ 'comments.title' | transloco }}</h3>
 
   <form class="comment-form" (submit)="post(); $event.preventDefault()">
-    <label class="sr-only" for="comment-draft">Write a comment</label>
+    <label class="sr-only" for="comment-draft">{{ 'comments.write' | transloco }}</label>
     <textarea
       id="comment-draft"
       rows="3"
-      placeholder="Write a comment"
+      [placeholder]="'comments.write' | transloco"
       [value]="draft()"
       [attr.maxlength]="maxLength"
       (input)="onDraftInput($event)"
@@ -15,32 +15,36 @@
       <span class="comment-counter" [class.over]="remaining(draft()) < 0">{{
         remaining(draft())
       }}</span>
-      <button type="submit" [disabled]="!canPost()">Post</button>
+      <button type="submit" [disabled]="!canPost()">{{ 'comments.post' | transloco }}</button>
     </div>
   </form>
 
   @if (actionError(); as error) {
-    <p class="comment-error" role="alert">{{ error }}</p>
+    <p class="comment-error" role="alert">{{ error | transloco }}</p>
   }
 
   @if (commentsResource.isLoading() && !comments().length) {
-    <p class="comment-status">Loading comments...</p>
+    <p class="comment-status">{{ 'comments.loading' | transloco }}</p>
   } @else if (commentsResource.error()) {
-    <p class="comment-status">Could not load comments.</p>
+    <p class="comment-status">{{ 'comments.loadFailed' | transloco }}</p>
   } @else {
     <ul class="comment-list">
       @for (comment of comments(); track comment.id) {
         <li class="comment">
           <p class="comment-meta">
-            <a class="comment-author" [routerLink]="['/users', comment.username]">{{ comment.username }}</a>
+            <a class="comment-author" [routerLink]="['/users', comment.username]">{{
+              comment.username
+            }}</a>
             <span>{{ formatDate(comment.created_at) }}</span>
             @if (comment.updated_at !== comment.created_at) {
-              <span>(edited)</span>
+              <span>{{ 'comments.edited' | transloco }}</span>
             }
           </p>
 
           @if (editingId() === comment.id) {
-            <label class="sr-only" [for]="'comment-edit-' + comment.id">Edit comment</label>
+            <label class="sr-only" [for]="'comment-edit-' + comment.id">{{
+              'comments.editLabel' | transloco
+            }}</label>
             <textarea
               [id]="'comment-edit-' + comment.id"
               rows="3"
@@ -53,22 +57,28 @@
                 remaining(editDraft())
               }}</span>
               <button type="button" [disabled]="!canSaveEdit()" (click)="saveEdit(comment)">
-                Save
+                {{ 'common.save' | transloco }}
               </button>
-              <button type="button" (click)="cancelEdit()">Cancel</button>
+              <button type="button" (click)="cancelEdit()">
+                {{ 'common.cancel' | transloco }}
+              </button>
             </div>
           } @else {
             <p class="comment-content">{{ comment.content }}</p>
             @if (isOwn(comment)) {
               <div class="comment-actions">
-                <button type="button" [disabled]="busy()" (click)="startEdit(comment)">Edit</button>
-                <button type="button" [disabled]="busy()" (click)="remove(comment)">Delete</button>
+                <button type="button" [disabled]="busy()" (click)="startEdit(comment)">
+                  {{ 'common.edit' | transloco }}
+                </button>
+                <button type="button" [disabled]="busy()" (click)="remove(comment)">
+                  {{ 'common.delete' | transloco }}
+                </button>
               </div>
             }
           }
         </li>
       } @empty {
-        <li class="comment-status">No comments yet.</li>
+        <li class="comment-status">{{ 'comments.empty' | transloco }}</li>
       }
     </ul>
   }

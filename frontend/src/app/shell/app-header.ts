@@ -1,13 +1,14 @@
 import { isPlatformBrowser } from '@angular/common';
 import { Component, PLATFORM_ID, computed, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import { AuthService } from '../auth/auth.service';
 import { LANGUAGES, LanguageService } from './language.service';
 
 @Component({
   selector: 'app-header',
-  imports: [RouterLink],
+  imports: [RouterLink, TranslocoPipe],
   templateUrl: './app-header.html',
   styleUrl: './app-header.scss',
 })
@@ -35,7 +36,7 @@ export class AppHeader {
   }
 
   protected onLanguageChange(event: Event): void {
-    this.language.set((event.target as HTMLSelectElement).value);
+    void this.language.choose((event.target as HTMLSelectElement).value);
   }
 
   protected async logout(): Promise<void> {

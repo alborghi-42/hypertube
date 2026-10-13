@@ -11,8 +11,10 @@ import {
 import { NonNullableFormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import { type AuthErrorBody, type AuthUser, AuthService, safeReturnUrl } from '../auth.service';
+import { MessagePipe, msg, type Message } from '../../i18n/message';
 import { applyServerErrors, controlError } from '../form-errors';
 import { NAME_VALIDATORS, USERNAME_VALIDATORS } from '../validation';
 
@@ -35,7 +37,7 @@ const PROVIDER_LABELS: Record<string, string> = { '42': '42', github: 'GitHub' }
  */
 @Component({
   selector: 'app-complete-profile',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, TranslocoPipe, MessagePipe],
   templateUrl: './complete-profile.html',
   styleUrl: '../auth-form.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -54,7 +56,7 @@ export class CompleteProfile implements OnInit {
   readonly pending = signal<PendingSignup | null>(null);
   readonly loading = signal(true);
   readonly submitting = signal(false);
-  readonly formError = signal<string | null>(null);
+  readonly formError = signal<Message | null>(null);
 
   readonly controlError = controlError;
   readonly providerLabel = (p: string): string => PROVIDER_LABELS[p] ?? p;
@@ -72,7 +74,7 @@ export class CompleteProfile implements OnInit {
       const body = (
         error instanceof HttpErrorResponse ? error.error : null
       ) as AuthErrorBody | null;
-      this.formError.set(body?.error ?? 'No pending sign-up, please log in again');
+      this.formError.set(body?.error ? { text: body.error } : msg('errors.noPendingSignup'));
     } finally {
       this.loading.set(false);
     }
@@ -97,7 +99,7 @@ export class CompleteProfile implements OnInit {
       this.auth.adopt(res.user);
       await this.router.navigateByUrl(safeReturnUrl(res.return_url));
     } catch (error) {
-      this.formError.set(applyServerErrors(this.form, error, 'Sign-up failed, please try again'));
+      this.formError.set(applyServerErrors(this.form, error, 'errors.signupFailed'));
     } finally {
       this.submitting.set(false);
     }

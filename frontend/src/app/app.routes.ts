@@ -10,18 +10,34 @@ import { Browse } from './browse/browse';
 import { Profile } from './profile/profile';
 import { UserProfile } from './profile/user-profile';
 
+/** `title` values are translation keys, see i18n/title-strategy.ts. */
 export const routes: Routes = [
   // Library and video pages are for logged-in users only.
-  { path: '', component: Browse, title: 'Hypertube', canActivate: [authGuard] },
+  { path: '', component: Browse, canActivate: [authGuard] },
   // Same page with the player modal open; deep-linkable.
-  { path: 'watch/:id', component: Browse, title: 'Hypertube', canActivate: [authGuard] },
-  { path: 'profile', component: Profile, title: 'Your profile · Hypertube', canActivate: [authGuard] },
-  { path: 'users/:username', component: UserProfile, title: 'Profile · Hypertube', canActivate: [authGuard] },
-  { path: 'login', component: Login, title: 'Log in · Hypertube', canActivate: [guestGuard] },
-  { path: 'register', component: Register, title: 'Sign up · Hypertube', canActivate: [guestGuard] },
-  { path: 'oauth/complete', component: CompleteProfile, title: 'Complete your profile · Hypertube', canActivate: [guestGuard] },
-  { path: 'forgot-password', component: ForgotPassword, title: 'Forgot password · Hypertube', canActivate: [guestGuard] },
+  { path: 'watch/:id', component: Browse, canActivate: [authGuard] },
+  { path: 'profile', component: Profile, title: 'titles.profile', canActivate: [authGuard] },
+  {
+    path: 'users/:username',
+    component: UserProfile,
+    title: 'titles.userProfile',
+    canActivate: [authGuard],
+  },
+  { path: 'login', component: Login, title: 'titles.login', canActivate: [guestGuard] },
+  { path: 'register', component: Register, title: 'titles.register', canActivate: [guestGuard] },
+  {
+    path: 'oauth/complete',
+    component: CompleteProfile,
+    title: 'titles.completeProfile',
+    canActivate: [guestGuard],
+  },
+  {
+    path: 'forgot-password',
+    component: ForgotPassword,
+    title: 'titles.forgotPassword',
+    canActivate: [guestGuard],
+  },
   // No guard: the emailed link must also work in a browser that is logged in.
-  { path: 'reset-password', component: ResetPassword, title: 'Reset password · Hypertube' },
+  { path: 'reset-password', component: ResetPassword, title: 'titles.resetPassword' },
   { path: '**', redirectTo: '' },
 ];

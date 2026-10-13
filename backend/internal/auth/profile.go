@@ -18,8 +18,9 @@ import (
 )
 
 // Languages a user can pick as preferred language (subject: defaults to English).
-// Mirrored by frontend/src/app/profile/profile-api.ts.
-var supportedLanguages = map[string]bool{"en": true, "fr": true, "it": true, "es": true, "de": true}
+// Mirrored by LANGUAGES in frontend/src/app/shell/language.service.ts: the UI is translated
+// into exactly these.
+var supportedLanguages = map[string]bool{"en": true, "fr": true, "it": true}
 
 // ProfileHandler serves /api/users/* (profiles) and /api/avatars/* (avatar files).
 type ProfileHandler struct {

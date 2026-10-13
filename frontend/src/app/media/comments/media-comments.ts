@@ -8,8 +8,10 @@ import {
   signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import { AuthService } from '../../auth/auth.service';
+import { LanguageService } from '../../shell/language.service';
 import { CommentsApi, MAX_COMMENT_LENGTH, type MediaComment } from '../comments-api';
 
 /** Length in characters (code points), as the backend counts runes. */
@@ -26,7 +28,7 @@ function isValidComment(text: string): boolean {
 /** Comment thread of one media item. Only the author sees edit/delete on a comment. */
 @Component({
   selector: 'app-media-comments',
-  imports: [RouterLink],
+  imports: [RouterLink, TranslocoPipe],
   templateUrl: './media-comments.html',
   styleUrl: './media-comments.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -34,6 +36,7 @@ function isValidComment(text: string): boolean {
 export class MediaComments {
   private readonly api = inject(CommentsApi);
   private readonly auth = inject(AuthService);
+  private readonly language = inject(LanguageService);
 
   /** Internal media id (UUID) as returned by /api/media/details. */
   readonly mediaId = input.required<string>();
@@ -43,6 +46,7 @@ export class MediaComments {
   readonly editingId = signal<string | null>(null);
   readonly editDraft = signal('');
   readonly busy = signal(false);
+  /** Translation key of the last failed action. */
   readonly actionError = signal<string | null>(null);
 
   readonly commentsResource = resource({
@@ -76,7 +80,7 @@ export class MediaComments {
       const created = await this.api.create(this.mediaId(), this.draft().trim());
       this.commentsResource.update((list) => [created, ...(list ?? [])]);
       this.draft.set('');
-    }, 'Could not post your comment.');
+    }, 'comments.postFailed');
   }
 
   startEdit(comment: MediaComment): void {
@@ -97,7 +101,7 @@ export class MediaComments {
         (list ?? []).map((c) => (c.id === updated.id ? updated : c)),
       );
       this.editingId.set(null);
-    }, 'Could not save your changes.');
+    }, 'comments.saveFailed');
   }
 
   async remove(comment: MediaComment): Promise<void> {
@@ -105,12 +109,12 @@ export class MediaComments {
     await this.run(async () => {
       await this.api.remove(this.mediaId(), comment.id);
       this.commentsResource.update((list) => (list ?? []).filter((c) => c.id !== comment.id));
-    }, 'Could not delete the comment.');
+    }, 'comments.deleteFailed');
   }
 
   formatDate(value: string): string {
     const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? '' : parsed.toLocaleString();
+    return Number.isNaN(parsed.getTime()) ? '' : parsed.toLocaleString(this.language.current());
   }
 
   private async run(action: () => Promise<void>, failure: string): Promise<void> {

@@ -2,14 +2,16 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
+import { MessagePipe, msg, type Message } from '../../i18n/message';
 import { applyServerErrors, controlError } from '../form-errors';
 import { PasswordResetService } from '../password-reset.service';
 import { EMAIL_VALIDATORS } from '../validation';
 
 @Component({
   selector: 'app-forgot-password',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, TranslocoPipe, MessagePipe],
   templateUrl: './forgot-password.html',
   styleUrl: '../auth-form.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -22,7 +24,7 @@ export class ForgotPassword {
   });
   readonly submitting = signal(false);
   readonly sent = signal(false);
-  readonly formError = signal<string | null>(null);
+  readonly formError = signal<Message | null>(null);
 
   readonly controlError = controlError;
 
@@ -39,8 +41,8 @@ export class ForgotPassword {
     } catch (error) {
       this.formError.set(
         error instanceof HttpErrorResponse && error.status === 429
-          ? 'Too many reset requests. Please wait a while and try again.'
-          : applyServerErrors(this.form, error, 'Request failed, please try again'),
+          ? msg('errors.tooManyResets')
+          : applyServerErrors(this.form, error, 'errors.requestFailed'),
       );
     } finally {
       this.submitting.set(false);

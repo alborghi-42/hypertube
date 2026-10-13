@@ -1,25 +1,23 @@
 <div class="hypertube-shell">
   <header class="hypertube-header">
-    <p class="status-line">Hypertube // Video Feed</p>
-    <h1>Discover, Search, Watch</h1>
-    <p class="subtitle">
-      Legal films from the Internet Archive, streamed while the server downloads them.
-    </p>
+    <p class="status-line">{{ 'browse.statusLine' | transloco }}</p>
+    <h1>{{ 'browse.title' | transloco }}</h1>
+    <p class="subtitle">{{ 'browse.subtitle' | transloco }}</p>
   </header>
 
-  <div class="search-area" role="search" aria-label="Hypertube search">
-    <label class="sr-only" for="hypertube-search">Search videos</label>
+  <div class="search-area" role="search" [attr.aria-label]="'browse.searchRegion' | transloco">
+    <label class="sr-only" for="hypertube-search">{{ 'browse.searchLabel' | transloco }}</label>
     <input
       id="hypertube-search"
       type="search"
       [value]="searchQuery()"
       (input)="onSearchInput($event)"
-      placeholder="Search Hypertube"
-      aria-label="Search Hypertube videos"
+      [placeholder]="'browse.searchPlaceholder' | transloco"
+      [attr.aria-label]="'browse.searchAria' | transloco"
     />
   </div>
 
-  <div class="category-row" aria-label="Video categories">
+  <div class="category-row" [attr.aria-label]="'browse.categories' | transloco">
     @for (category of categories(); track category) {
       <button
         type="button"
@@ -27,29 +25,33 @@
         [class.active]="category === effectiveCategory()"
         (click)="selectCategory(category)"
       >
-        {{ category }}
+        {{ category === 'All' ? ('browse.allCategory' | transloco) : category }}
       </button>
     }
   </div>
 
   @if (mediaResource.isLoading() && !allDocs().length) {
     <div class="resource-state" aria-live="polite">
-      <h2>Loading media feed...</h2>
-      <p>Pulling the latest catalog from the Internet Archive.</p>
+      <h2>{{ 'browse.loadingTitle' | transloco }}</h2>
+      <p>{{ 'browse.loadingBody' | transloco }}</p>
     </div>
   } @else if (mediaResource.error() && !allDocs().length) {
     <div class="resource-state error" aria-live="assertive">
-      <h2>Could not load media feed</h2>
-      <p>The media API did not respond correctly.</p>
-      <button type="button" class="retry-btn" (click)="reloadMedia()">Retry</button>
+      <h2>{{ 'browse.errorTitle' | transloco }}</h2>
+      <p>{{ 'browse.errorBody' | transloco }}</p>
+      <button type="button" class="retry-btn" (click)="reloadMedia()">
+        {{ 'common.retry' | transloco }}
+      </button>
     </div>
   } @else {
-    <section class="video-grid" aria-label="Video results">
+    <section class="video-grid" [attr.aria-label]="'browse.results' | transloco">
       @for (video of filteredVideos(); track video.id) {
         <article
           class="video-card"
           title="{{ video.title }}"
-          aria-label="Video titled {{ video.title }} by {{ video.channel }}"
+          [attr.aria-label]="
+            'browse.videoAria' | transloco: { title: video.title, channel: video.channel }
+          "
           role="button"
           tabindex="0"
           (click)="openVideoModal(video.id)"
@@ -57,9 +59,14 @@
           (keydown.space)="openVideoModal(video.id); $event.preventDefault()"
         >
           <div class="thumbnail" [style.--video-accent]="video.accent">
-            <img class="thumb-image" [src]="video.thumbnailUrl" [alt]="video.title" loading="lazy" />
+            <img
+              class="thumb-image"
+              [src]="video.thumbnailUrl"
+              [alt]="video.title"
+              loading="lazy"
+            />
           </div>
-          <div class="video-meta" aria-label="Video details">
+          <div class="video-meta" [attr.aria-label]="'browse.videoDetails' | transloco">
             <h2>{{ video.title }}</h2>
             <p class="channel">{{ video.channel }}</p>
             <p class="stats">{{ video.category }} | {{ video.published }}</p>
@@ -67,24 +74,30 @@
         </article>
       } @empty {
         <div class="empty-state">
-          <h2>No videos found</h2>
-          <p>Try a broader search term or switch back to the All category.</p>
+          <h2>{{ 'browse.emptyTitle' | transloco }}</h2>
+          <p>{{ 'browse.emptyBody' | transloco }}</p>
         </div>
       }
     </section>
 
     @if (isLoadingMore()) {
-      <div class="load-more-state" aria-live="polite" aria-label="Loading more videos">
+      <div
+        class="load-more-state"
+        aria-live="polite"
+        [attr.aria-label]="'browse.loadingMoreAria' | transloco"
+      >
         <span class="load-more-spinner"></span>
-        <span>Loading more...</span>
+        <span>{{ 'browse.loadingMore' | transloco }}</span>
       </div>
     } @else if (mediaResource.error()) {
       <div class="load-more-state error" aria-live="assertive">
-        <span>Failed to load next page.</span>
-        <button type="button" class="retry-btn" (click)="reloadMedia()">Retry</button>
+        <span>{{ 'browse.nextPageFailed' | transloco }}</span>
+        <button type="button" class="retry-btn" (click)="reloadMedia()">
+          {{ 'common.retry' | transloco }}
+        </button>
       </div>
     } @else if (!hasMore() && allDocs().length) {
-      <p class="end-of-feed">// end of feed</p>
+      <p class="end-of-feed">{{ 'browse.endOfFeed' | transloco }}</p>
     }
 
     @if (selectedVideo(); as activeVideo) {
@@ -93,7 +106,7 @@
           class="video-modal"
           role="dialog"
           aria-modal="true"
-          [attr.aria-label]="'Streaming ' + activeVideo.title"
+          [attr.aria-label]="'browse.streaming' | transloco: { title: activeVideo.title }"
         >
           <header class="video-modal-header">
             <h2>{{ activeVideo.title }}</h2>
@@ -101,9 +114,9 @@
               type="button"
               class="video-modal-close"
               (click)="closeVideoModal()"
-              aria-label="Close video player"
+              [attr.aria-label]="'browse.closePlayer' | transloco"
             >
-              Close
+              {{ 'common.close' | transloco }}
             </button>
           </header>
 
@@ -112,37 +125,51 @@
               <video class="video-player" [src]="streamUrl" controls autoplay playsinline></video>
             } @else if (selectedVideoHasStreamError()) {
               <div class="resource-state error" aria-live="assertive">
-                <h3>Unable to load stream</h3>
-                <p>The server could not provide a stream URL for this video.</p>
+                <h3>{{ 'browse.streamErrorTitle' | transloco }}</h3>
+                <p>{{ 'browse.streamErrorBody' | transloco }}</p>
               </div>
             } @else {
-              <div class="video-player-loading" aria-live="polite" aria-label="Loading video player">
+              <div
+                class="video-player-loading"
+                aria-live="polite"
+                [attr.aria-label]="'browse.playerLoadingAria' | transloco"
+              >
                 <div class="video-player-loading-surface">
                   <span class="video-player-loader" aria-hidden="true"></span>
-                  <p>Loading video player...</p>
+                  <p>{{ 'browse.playerLoading' | transloco }}</p>
                 </div>
               </div>
             }
           </div>
 
-          <section class="video-modal-details" aria-label="Media details">
+          <section
+            class="video-modal-details"
+            [attr.aria-label]="'browse.mediaDetails' | transloco"
+          >
             <p class="video-modal-meta video-modal-meta-primary">
               {{ activeVideo.category }} | {{ activeVideo.published }} |
-              <a [href]="activeVideo.detailsUrl" target="_blank" rel="noopener noreferrer"
-                >Open on Archive.org</a
-              >
+              <a [href]="activeVideo.detailsUrl" target="_blank" rel="noopener noreferrer">{{
+                'browse.openArchive' | transloco
+              }}</a>
             </p>
 
             @if (selectedVideoDetailsResource.isLoading()) {
-              <p class="video-modal-meta video-modal-meta-status">Loading details...</p>
+              <p class="video-modal-meta video-modal-meta-status">
+                {{ 'browse.detailsLoading' | transloco }}
+              </p>
             } @else if (selectedVideoDetailsResource.error()) {
-              <p class="video-modal-meta video-modal-meta-status">Could not load media details.</p>
+              <p class="video-modal-meta video-modal-meta-status">
+                {{ 'browse.detailsFailed' | transloco }}
+              </p>
             } @else if (selectedVideoDetails(); as details) {
               @if (details.description?.trim()) {
                 <p class="video-modal-description">{{ details.description }}</p>
               }
 
-              <div class="video-modal-detail-row" aria-label="Extended media metadata">
+              <div
+                class="video-modal-detail-row"
+                [attr.aria-label]="'browse.extendedMetadata' | transloco"
+              >
                 <span class="video-modal-detail-chip">{{
                   details.creator?.trim() || activeVideo.channel
                 }}</span>

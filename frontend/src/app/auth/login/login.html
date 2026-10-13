@@ -1,42 +1,47 @@
 <form class="auth-card" [formGroup]="form" (ngSubmit)="submit()" novalidate>
-  <h1>Log in</h1>
+  <h1>{{ 'login.title' | transloco }}</h1>
 
   <app-oauth-buttons />
 
   <label class="field">
-    Username
+    {{ 'fields.username' | transloco }}
     <input
       formControlName="username"
       autocomplete="username"
-      [attr.aria-invalid]="controlError(form.controls.username, 'Username') !== null"
+      [attr.aria-invalid]="controlError(form.controls.username) !== null"
     />
-    @if (controlError(form.controls.username, 'Username'); as message) {
-      <p class="field-error">{{ message }}</p>
+    @if (controlError(form.controls.username); as message) {
+      <p class="field-error">{{ message | message }}</p>
     }
   </label>
 
   <label class="field">
-    Password
+    {{ 'fields.password' | transloco }}
     <input
       type="password"
       formControlName="password"
       autocomplete="current-password"
-      [attr.aria-invalid]="controlError(form.controls.password, 'Password') !== null"
+      [attr.aria-invalid]="controlError(form.controls.password) !== null"
     />
-    @if (controlError(form.controls.password, 'Password'); as message) {
-      <p class="field-error">{{ message }}</p>
+    @if (controlError(form.controls.password); as message) {
+      <p class="field-error">{{ message | message }}</p>
     }
   </label>
 
-  <p class="switch"><a routerLink="/forgot-password">Forgot password?</a></p>
+  <p class="switch">
+    <a routerLink="/forgot-password">{{ 'login.forgot' | transloco }}</a>
+  </p>
 
   @if (formError(); as message) {
-    <p class="form-error" role="alert">{{ message }}</p>
+    <p class="form-error" role="alert">{{ message | message }}</p>
   }
 
   <button type="submit" [disabled]="submitting()">
-    {{ submitting() ? 'Logging in...' : 'Log in' }}
+    {{ (submitting() ? 'login.submitting' : 'login.submit') | transloco }}
   </button>
 
-  <p class="switch">No account yet? <a routerLink="/register">Create one</a></p>
+  <p class="switch">
+    {{ 'login.noAccount' | transloco }}
+    <a routerLink="/register">{{ 'login.createOne' | transloco }}</a>
+  </p>
 </form>

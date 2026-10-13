@@ -1,0 +1,54 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.form-error {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--ht-danger);
+}
+
+.oauth-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.oauth-button {
+  display: block;
+  padding: 0.65rem;
+  border: 1px solid var(--ht-border-bold);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-bg-0);
+  color: var(--ht-text-0);
+  text-align: center;
+  text-decoration: none;
+  font-weight: 700;
+
+  &:hover {
+    border-color: var(--ht-accent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ht-accent);
+    outline-offset: 1px;
+  }
+}
+
+.oauth-divider {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--ht-text-1);
+
+  &::before,
+  &::after {
+    content: '';
+    flex: 1;
+    border-top: 1px solid var(--ht-border);
+  }
+}

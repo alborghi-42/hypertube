@@ -3,6 +3,7 @@ import { NonNullableFormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
 import { AuthService } from '../auth.service';
+import { OAuthButtons } from '../oauth/oauth-buttons';
 import { applyServerErrors, controlError } from '../form-errors';
 import {
   EMAIL_VALIDATORS,
@@ -13,7 +14,7 @@ import {
 
 @Component({
   selector: 'app-register',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, OAuthButtons],
   templateUrl: './register.html',
   styleUrl: '../auth-form.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

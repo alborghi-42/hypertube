@@ -1,6 +1,8 @@
 <form class="auth-card" [formGroup]="form" (ngSubmit)="submit()" novalidate>
   <h1>Create an account</h1>
 
+  <app-oauth-buttons />
+
   <label class="field">
     Email
     <input

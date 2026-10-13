@@ -1,0 +1,63 @@
+<form class="auth-card" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <h1>Complete your profile</h1>
+
+  @if (loading()) {
+    <p class="switch">Loading...</p>
+  } @else if (pending(); as p) {
+    <p class="switch">
+      Signing up with {{ providerLabel(p.provider) }} as <strong>{{ p.email }}</strong
+      >.
+    </p>
+
+    <label class="field">
+      Username
+      <input
+        type="text"
+        formControlName="username"
+        autocomplete="username"
+        [attr.aria-invalid]="controlError(form.controls.username, 'Username') !== null"
+      />
+      @if (controlError(form.controls.username, 'Username'); as message) {
+        <p class="field-error">{{ message }}</p>
+      }
+    </label>
+
+    <label class="field">
+      First name
+      <input
+        type="text"
+        formControlName="first_name"
+        autocomplete="given-name"
+        [attr.aria-invalid]="controlError(form.controls.first_name, 'First name') !== null"
+      />
+      @if (controlError(form.controls.first_name, 'First name'); as message) {
+        <p class="field-error">{{ message }}</p>
+      }
+    </label>
+
+    <label class="field">
+      Last name
+      <input
+        type="text"
+        formControlName="last_name"
+        autocomplete="family-name"
+        [attr.aria-invalid]="controlError(form.controls.last_name, 'Last name') !== null"
+      />
+      @if (controlError(form.controls.last_name, 'Last name'); as message) {
+        <p class="field-error">{{ message }}</p>
+      }
+    </label>
+  }
+
+  @if (formError(); as message) {
+    <p class="form-error" role="alert">{{ message }}</p>
+  }
+
+  @if (pending()) {
+    <button type="submit" [disabled]="submitting()">
+      {{ submitting() ? 'Creating account...' : 'Create account' }}
+    </button>
+  }
+
+  <p class="switch"><a routerLink="/login">Back to log in</a></p>
+</form>

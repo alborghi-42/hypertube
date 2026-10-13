@@ -20,6 +20,8 @@ type Config struct {
 	// CookieSecure sets the Secure flag on session/CSRF cookies. Default true;
 	// set COOKIE_SECURE=false only for local development over plain http.
 	CookieSecure bool
+	// OAuth login (42 intra, GitHub); see oauth.go.
+	OAuth OAuthConfig
 }
 
 func Load() Config {
@@ -32,6 +34,7 @@ func Load() Config {
 		OMDBAPIKey:   os.Getenv("OMDB_API_KEY"),
 		BasePath:     strings.TrimRight(os.Getenv("BASE_PATH"), "/"),
 		CookieSecure: envBool("COOKIE_SECURE", true),
+		OAuth:        loadOAuth(),
 	}
 }
 

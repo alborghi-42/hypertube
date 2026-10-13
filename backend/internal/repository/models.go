@@ -38,6 +38,13 @@ type Medium struct {
 	UpdatedAt       pgtype.Timestamptz
 }
 
+type OauthIdentity struct {
+	Provider       string
+	ProviderUserID string
+	UserID         pgtype.UUID
+	CreatedAt      pgtype.Timestamptz
+}
+
 type Session struct {
 	TokenHash []byte
 	UserID    pgtype.UUID

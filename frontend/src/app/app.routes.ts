@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 
 import { authGuard, guestGuard } from './auth/auth.guard';
 import { Login } from './auth/login/login';
+import { CompleteProfile } from './auth/oauth/complete-profile';
 import { Register } from './auth/register/register';
 import { Browse } from './browse/browse';
 
@@ -12,5 +13,6 @@ export const routes: Routes = [
   { path: 'watch/:id', component: Browse, title: 'Hypertube', canActivate: [authGuard] },
   { path: 'login', component: Login, title: 'Log in · Hypertube', canActivate: [guestGuard] },
   { path: 'register', component: Register, title: 'Sign up · Hypertube', canActivate: [guestGuard] },
+  { path: 'oauth/complete', component: CompleteProfile, title: 'Complete your profile · Hypertube', canActivate: [guestGuard] },
   { path: '**', redirectTo: '' },
 ];

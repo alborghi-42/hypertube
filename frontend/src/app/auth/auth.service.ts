@@ -88,6 +88,11 @@ export class AuthService {
     }
   }
 
+  /** Sets the user after a login that did not go through login()/register() (OAuth sign-up). */
+  adopt(user: AuthUser): void {
+    this.state.set(user);
+  }
+
   /** Called by the interceptor when the backend answers 401 (session expired/revoked). */
   markLoggedOut(): void {
     this.state.set(null);

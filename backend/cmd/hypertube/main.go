@@ -81,6 +81,7 @@ func main() {
 		stream := router.Group("/stream", sessions.Require())
 
 		auth.NewHandler(pool, sessions, log).RegisterRoutes(api, authed)
+		auth.NewOAuth(pool, sessions, cookies, cfg.BasePath, cfg.OAuth, log).RegisterRoutes(api)
 
 		downloadDir := filepath.Join(cfg.DataDir, "downloads")
 		providers := media.NewRegistry(media.NewArchiveOrg(downloadDir, cfg.OMDBAPIKey, log))

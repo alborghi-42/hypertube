@@ -1,0 +1,10 @@
+@if (error(); as message) {
+  <p class="form-error" role="alert">{{ message }}</p>
+}
+<div class="oauth-buttons">
+  <a class="oauth-button" [href]="'api/auth/42/start?returnUrl=' + returnUrl()">Log in with 42</a>
+  <a class="oauth-button" [href]="'api/auth/github/start?returnUrl=' + returnUrl()"
+    >Log in with GitHub</a
+  >
+</div>
+<p class="oauth-divider"><span>or</span></p>

@@ -1,6 +1,8 @@
 <form class="auth-card" [formGroup]="form" (ngSubmit)="submit()" novalidate>
   <h1>Log in</h1>
 
+  <app-oauth-buttons />
+
   <label class="field">
     Username
     <input

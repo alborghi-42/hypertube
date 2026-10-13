@@ -180,8 +180,18 @@ func (p *PublicDomainTorrents) toMedia(e pdtEntry, d *pdtDetails) Media {
 	if d != nil {
 		m.Description = d.Description
 		m.ThumbnailURL = d.Thumbnail
+		m.ImdbID = d.ImdbID
 	}
 	return m
+}
+
+// omdbQueryOf matches on the film page's IMDb link when there is one (the
+// catalogue titles carry no year, so a title lookup may hit a remake).
+func (p *PublicDomainTorrents) omdbQueryOf(m Media) omdbQuery {
+	if m.ImdbID != "" {
+		return omdbQuery{ImdbID: m.ImdbID}
+	}
+	return omdbQuery{Title: m.Title}
 }
 
 // page slices entries for 1-based page/rows and enriches them with their
@@ -214,14 +224,10 @@ func (p *PublicDomainTorrents) page(ctx context.Context, entries []pdtEntry, pag
 				p.log.Debug("publicdomaintorrents film page unavailable", "movieid", e.ID, "error", err)
 			}
 			list[i] = p.toMedia(e, d)
-			if p.omdbKey != "" {
-				if rating, _, err := omdbStats(ctx, p.omdbKey, e.Title); err == nil {
-					list[i].ImdbRating = rating
-				}
-			}
 		}()
 	}
 	wg.Wait()
+	enrichOMDB(ctx, p.omdbKey, list, func(i int) omdbQuery { return p.omdbQueryOf(list[i]) })
 	return list
 }
 
@@ -265,11 +271,11 @@ func (p *PublicDomainTorrents) FetchByID(ctx context.Context, id string) (*Media
 		return nil, err
 	}
 	m := p.toMedia(pdtEntry{ID: id, Title: d.Title}, d)
-	rating, actors, err := omdbStats(ctx, p.omdbKey, d.Title)
+	info, err := omdbLookup(ctx, p.omdbKey, p.omdbQueryOf(m))
 	if err != nil {
 		p.log.Warn("OMDB stats unavailable", "title", d.Title, "error", err)
 	}
-	m.ImdbRating, m.Actors = rating, actors
+	applyOMDB(&m, info)
 	return &m, nil
 }
 

@@ -29,7 +29,11 @@ type Media struct {
 	FileSize       int64  `json:"file_size"`
 	MimeType       string `json:"mime_type"`
 
+	// Year is the production year (provider date, else OMDB); "" if unknown.
+	Year       string   `json:"year"`
 	Actors     []string `json:"actors"`
+	Genres     []string `json:"genres"`
+	ImdbID     string   `json:"imdb_id,omitempty"`
 	ImdbRating float64  `json:"imdb_rating"`
 
 	CreatedAt time.Time `json:"created_at"`

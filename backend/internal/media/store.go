@@ -65,6 +65,7 @@ func mediaFromRow(r repository.Medium) *Media {
 		Description:     deref(r.Description),
 		Creator:         deref(r.Creator),
 		Date:            deref(r.Date),
+		Year:            mediaYear(deref(r.Date)),
 		ThumbnailURL:    deref(r.ThumbnailUrl),
 		DurationSeconds: deref(r.DurationSeconds),
 		DownloadStatus:  deref(r.DownloadStatus),

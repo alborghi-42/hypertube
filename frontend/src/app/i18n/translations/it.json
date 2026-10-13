@@ -167,7 +167,12 @@
     "detailsFailed": "Impossibile caricare i dettagli del media.",
     "extendedMetadata": "Metadati estesi",
     "unknownDate": "Data sconosciuta",
-    "unknownDuration": "Durata sconosciuta"
+    "unknownDuration": "Durata sconosciuta",
+    "unknownYear": "Anno sconosciuto",
+    "imdbRating": "IMDb {{rating}}",
+    "imdbRatingAria": "Voto IMDb {{rating}} su 10",
+    "noRating": "Nessun voto IMDb",
+    "noRatingShort": "IMDb n/d"
   },
   "comments": {
     "title": "Commenti",

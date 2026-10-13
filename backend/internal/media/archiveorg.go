@@ -92,11 +92,6 @@ func (a *ArchiveOrg) FetchByID(ctx context.Context, id string) (*Media, error) {
 		date = result.CreatedStr
 	}
 
-	rating, actors, err := omdbStats(ctx, a.omdbKey, md.Title)
-	if err != nil {
-		a.log.Warn("OMDB stats unavailable", "title", md.Title, "error", err)
-	}
-
 	externalID := md.Identifier
 	if externalID == "" {
 		externalID = id
@@ -107,7 +102,7 @@ func (a *ArchiveOrg) FetchByID(ctx context.Context, id string) (*Media, error) {
 	}
 
 	now := time.Now()
-	return &Media{
+	m := &Media{
 		ID:           InternalID(externalID, a.ID()),
 		ExternalID:   externalID,
 		Provider:     a.ID(),
@@ -115,12 +110,17 @@ func (a *ArchiveOrg) FetchByID(ctx context.Context, id string) (*Media, error) {
 		Description:  md.Description,
 		Creator:      md.Creator,
 		Date:         date,
+		Year:         mediaYear(md.Date),
 		ThumbnailURL: thumbnailURL(externalID),
 		CreatedAt:    now,
 		UpdatedAt:    now,
-		Actors:       actors,
-		ImdbRating:   rating,
-	}, nil
+	}
+	info, err := omdbLookup(ctx, a.omdbKey, omdbQuery{Title: md.Title, Year: m.Year})
+	if err != nil {
+		a.log.Warn("OMDB stats unavailable", "title", md.Title, "error", err)
+	}
+	applyOMDB(m, info)
+	return m, nil
 }
 
 // Search matches the user's words (escaped, all required) against
@@ -178,25 +178,25 @@ func (a *ArchiveOrg) search(ctx context.Context, lucene, sortBy string, page, ro
 		if date == "" {
 			date = item.PublicDate
 		}
-		rating, _, err := omdbStats(ctx, a.omdbKey, item.Title)
-		if err != nil {
-			a.log.Debug("OMDB stats unavailable for search result", "title", item.Title, "error", err)
-		}
 		now := time.Now()
 		list[i] = Media{
-			ID:           InternalID(item.Identifier, a.ID()),
-			ExternalID:   item.Identifier,
-			Provider:     a.ID(),
-			Title:        item.Title,
-			Description:  item.Description,
-			Creator:      item.Creator,
-			Date:         date,
+			ID:          InternalID(item.Identifier, a.ID()),
+			ExternalID:  item.Identifier,
+			Provider:    a.ID(),
+			Title:       item.Title,
+			Description: item.Description,
+			Creator:     item.Creator,
+			Date:        date,
+			// publicdate is the upload date, not the production year.
+			Year:         mediaYear(item.Date),
 			ThumbnailURL: thumbnailURL(item.Identifier),
 			CreatedAt:    now,
 			UpdatedAt:    now,
-			ImdbRating:   rating,
 		}
 	}
+	enrichOMDB(ctx, a.omdbKey, list, func(i int) omdbQuery {
+		return omdbQuery{Title: list[i].Title, Year: list[i].Year}
+	})
 	return list, nil
 }
 

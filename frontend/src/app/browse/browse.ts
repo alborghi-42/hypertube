@@ -32,6 +32,10 @@ interface Video {
   channel: string;
   provider: string;
   published: string;
+  year: string;
+  /** IMDb rating, null when unknown. */
+  rating: number | null;
+  genres: string[];
   category: string;
   accent: string;
   thumbnailUrl: string;
@@ -121,6 +125,10 @@ export class Browse {
           channel: rawChannel.length > 0 ? rawChannel : provider,
           provider,
           published: this.formatPublishedDate(doc.date),
+          year: doc.year?.trim() || yearOf(doc.date),
+          rating:
+            typeof doc.imdb_rating === 'number' && doc.imdb_rating > 0 ? doc.imdb_rating : null,
+          genres: doc.genres ?? [],
           category:
             rawCategory.length > 0 ? rawCategory : this.language.t('browse.archiveCategory'),
           accent: '0.71 0.17 150',
@@ -375,6 +383,12 @@ export class Browse {
       this.mediaResource.reload();
     }
   }
+}
+
+/** The 4-digit year at the start of a provider date, or "". */
+function yearOf(date: string | undefined): string {
+  const match = /^(\d{4})/.exec(date?.trim() ?? '');
+  return match?.[1] ?? '';
 }
 
 function cacheKeyOf(params: MediaListParams): string {

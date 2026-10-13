@@ -69,7 +69,26 @@
           <div class="video-meta" [attr.aria-label]="'browse.videoDetails' | transloco">
             <h2>{{ video.title }}</h2>
             <p class="channel">{{ video.channel }}</p>
-            <p class="stats">{{ video.category }} | {{ video.published }}</p>
+            <p class="stats">
+              <span>{{ video.year || ('browse.unknownYear' | transloco) }}</span>
+              <span
+                class="rating"
+                [class.unrated]="video.rating === null"
+                [attr.aria-label]="
+                  video.rating === null
+                    ? ('browse.noRating' | transloco)
+                    : ('browse.imdbRatingAria' | transloco: { rating: video.rating })
+                "
+                >{{
+                  video.rating === null
+                    ? ('browse.noRatingShort' | transloco)
+                    : ('browse.imdbRating' | transloco: { rating: video.rating.toFixed(1) })
+                }}</span
+              >
+            </p>
+            @if (video.genres.length) {
+              <p class="genres">{{ video.genres.join(', ') }}</p>
+            }
           </div>
         </article>
       } @empty {
@@ -147,7 +166,13 @@
             [attr.aria-label]="'browse.mediaDetails' | transloco"
           >
             <p class="video-modal-meta video-modal-meta-primary">
-              {{ activeVideo.category }} | {{ activeVideo.published }} |
+              {{ activeVideo.year || ('browse.unknownYear' | transloco) }} |
+              @if (activeVideo.rating !== null) {
+                {{ 'browse.imdbRating' | transloco: { rating: activeVideo.rating.toFixed(1) } }} |
+              }
+              @if (activeVideo.genres.length) {
+                {{ activeVideo.genres.join(', ') }} |
+              }
               <a [href]="activeVideo.detailsUrl" target="_blank" rel="noopener noreferrer">{{
                 'browse.openArchive' | transloco
               }}</a>

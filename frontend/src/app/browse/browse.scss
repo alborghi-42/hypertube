@@ -2,10 +2,13 @@
   display: block;
   flex: 1;
   background:
-    radial-gradient(circle at 12% -5%, oklch(from var(--ht-accent) l c h / 0.22), transparent 28rem),
+    radial-gradient(
+      circle at 12% -5%,
+      oklch(from var(--ht-accent) l c h / 0.22),
+      transparent 28rem
+    ),
     linear-gradient(var(--ht-border) 1px, transparent 1px),
-    linear-gradient(90deg, var(--ht-border) 1px, transparent 1px),
-    var(--ht-bg-0);
+    linear-gradient(90deg, var(--ht-border) 1px, transparent 1px), var(--ht-bg-0);
   background-size:
     100% 100%,
     120px 120px,
@@ -288,6 +291,31 @@
     margin-top: 0.5rem;
     color: var(--ht-text-1);
   }
+
+  .stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+  }
+
+  .rating {
+    color: var(--ht-accent);
+    font-weight: 700;
+
+    &.unrated {
+      color: var(--ht-text-2);
+      font-weight: 400;
+    }
+  }
+
+  .genres {
+    margin: 0.2rem 0 0;
+    font-size: 0.72rem;
+    color: var(--ht-text-2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
 
 .empty-state {
@@ -425,7 +453,11 @@
   place-items: center;
   padding: clamp(0.8rem, 2vw, 1.2rem);
   background:
-    linear-gradient(145deg, oklch(from var(--ht-bg-1) l c h / 0.9), oklch(from var(--ht-bg-0) l c h / 0.95)),
+    linear-gradient(
+      145deg,
+      oklch(from var(--ht-bg-1) l c h / 0.9),
+      oklch(from var(--ht-bg-0) l c h / 0.95)
+    ),
     repeating-linear-gradient(
       -45deg,
       oklch(from var(--ht-border) l c h / 0.18),

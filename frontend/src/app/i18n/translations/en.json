@@ -167,7 +167,12 @@
     "detailsFailed": "Could not load media details.",
     "extendedMetadata": "Extended media metadata",
     "unknownDate": "Unknown date",
-    "unknownDuration": "Unknown duration"
+    "unknownDuration": "Unknown duration",
+    "unknownYear": "Year unknown",
+    "imdbRating": "IMDb {{rating}}",
+    "imdbRatingAria": "IMDb rating {{rating}} out of 10",
+    "noRating": "No IMDb rating",
+    "noRatingShort": "IMDb n/a"
   },
   "comments": {
     "title": "Comments",

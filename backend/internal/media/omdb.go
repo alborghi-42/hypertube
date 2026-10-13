@@ -9,57 +9,204 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
-// omdbClient bounds every OMDB call; these run once per search result, serially.
+// omdbClient bounds every OMDB call.
 var omdbClient = &http.Client{Timeout: 10 * time.Second}
+
+const (
+	// omdbWorkers bounds concurrent OMDB lookups per result page.
+	omdbWorkers = 8
+	// omdbCacheTTL keeps hits (and misses, so unknown titles are not
+	// re-queried on every scroll) for a while; ratings change slowly.
+	omdbCacheTTL = 24 * time.Hour
+	// omdbCacheMax caps the cache; when full it is simply reset.
+	omdbCacheMax = 10000
+)
 
 type omdbResponse struct {
 	Actors     string `json:"Actors"`
+	Genre      string `json:"Genre"`
+	Year       string `json:"Year"`
+	ImdbID     string `json:"imdbID"`
 	ImdbRating string `json:"imdbRating"`
 	Response   string `json:"Response"`
 }
 
-// omdbStats returns the IMDb rating and actors for a movie title. With no
-// API key configured it returns an error, which callers treat as non-fatal.
-func omdbStats(ctx context.Context, apiKey, title string) (float64, []string, error) {
+// omdbInfo is the subset of an OMDB movie used for enrichment.
+type omdbInfo struct {
+	ImdbID string
+	Rating float64 // 0 when OMDB has no rating ("N/A")
+	Actors []string
+	Genres []string
+	Year   string
+}
+
+type omdbEntry struct {
+	info    *omdbInfo // nil: OMDB has no match
+	fetched time.Time
+}
+
+// omdbCache is shared by every provider: the same film is often listed by
+// several of them and requested again on each scroll or search keystroke.
+var omdbCache = struct {
+	sync.Mutex
+	m map[string]omdbEntry
+}{m: map[string]omdbEntry{}}
+
+// omdbQuery is what a lookup matches on. An IMDb id is exact; otherwise the
+// title is matched together with the year when the provider knows it, so a
+// homonymous remake is not picked up.
+type omdbQuery struct {
+	ImdbID string
+	Title  string
+	Year   string
+}
+
+func (q omdbQuery) key() string {
+	if q.ImdbID != "" {
+		return "i:" + q.ImdbID
+	}
+	return "t:" + titleKey(q.Title) + "\x00" + q.Year
+}
+
+func (q omdbQuery) empty() bool { return q.ImdbID == "" && titleKey(q.Title) == "" }
+
+// omdbLookup returns the OMDB movie for q, cached. With no API key it
+// returns an error, which callers treat as non-fatal; (nil, nil) means OMDB
+// has no such movie.
+func omdbLookup(ctx context.Context, apiKey string, q omdbQuery) (*omdbInfo, error) {
 	if apiKey == "" {
-		return 0, nil, errors.New("OMDB_API_KEY is not set")
+		return nil, errors.New("OMDB_API_KEY is not set")
+	}
+	if q.empty() {
+		return nil, nil
+	}
+	key := q.key()
+	omdbCache.Lock()
+	e, ok := omdbCache.m[key]
+	omdbCache.Unlock()
+	if ok && time.Since(e.fetched) < omdbCacheTTL {
+		return e.info, nil
 	}
 
-	q := url.Values{}
-	q.Set("apikey", apiKey)
-	q.Set("type", "movie")
-	q.Set("plot", "short")
-	q.Set("t", title)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://www.omdbapi.com/?"+q.Encode(), nil)
+	info, err := omdbFetch(ctx, apiKey, q)
 	if err != nil {
-		return 0, nil, fmt.Errorf("failed to build OMDB request: %w", err)
+		return nil, err
+	}
+	omdbCache.Lock()
+	if len(omdbCache.m) >= omdbCacheMax {
+		omdbCache.m = map[string]omdbEntry{}
+	}
+	omdbCache.m[key] = omdbEntry{info: info, fetched: time.Now()}
+	omdbCache.Unlock()
+	return info, nil
+}
+
+func omdbFetch(ctx context.Context, apiKey string, q omdbQuery) (*omdbInfo, error) {
+	v := url.Values{}
+	v.Set("apikey", apiKey)
+	v.Set("type", "movie")
+	v.Set("plot", "short")
+	if q.ImdbID != "" {
+		v.Set("i", q.ImdbID)
+	} else {
+		v.Set("t", q.Title)
+		if q.Year != "" {
+			v.Set("y", q.Year)
+		}
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://www.omdbapi.com/?"+v.Encode(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build OMDB request: %w", err)
 	}
 	resp, err := omdbClient.Do(req)
 	if err != nil {
-		return 0, nil, fmt.Errorf("failed to fetch OMDB data: %w", err)
+		return nil, fmt.Errorf("failed to fetch OMDB data: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return 0, nil, fmt.Errorf("OMDB API returned status code %d", resp.StatusCode)
+		return nil, fmt.Errorf("OMDB API returned status code %d", resp.StatusCode)
 	}
 
 	var body omdbResponse
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		return 0, nil, fmt.Errorf("failed to decode OMDB response: %w", err)
+		return nil, fmt.Errorf("failed to decode OMDB response: %w", err)
 	}
 	if body.Response != "True" {
-		return 0, nil, errors.New("movie not found")
+		return nil, nil
 	}
 
-	actors := strings.Split(body.Actors, ", ")
-	rating, err := strconv.ParseFloat(body.ImdbRating, 64)
-	if err != nil {
-		return 0, nil, fmt.Errorf("failed to parse IMDb rating: %w", err)
+	info := &omdbInfo{
+		ImdbID: body.ImdbID,
+		Actors: splitOMDBList(body.Actors),
+		Genres: splitOMDBList(body.Genre),
+		Year:   mediaYear(body.Year),
 	}
-	return rating, actors, nil
+	if r, err := strconv.ParseFloat(body.ImdbRating, 64); err == nil {
+		info.Rating = r
+	}
+	return info, nil
+}
+
+// splitOMDBList splits OMDB's "A, B, C" fields; "N/A" is empty.
+func splitOMDBList(s string) []string {
+	if s == "" || s == "N/A" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// applyOMDB copies the lookup result onto m. The provider's own year wins:
+// OMDB only fills it in when the provider has none.
+func applyOMDB(m *Media, info *omdbInfo) {
+	if info == nil {
+		return
+	}
+	m.ImdbID = info.ImdbID
+	m.ImdbRating = info.Rating
+	m.Actors = info.Actors
+	m.Genres = info.Genres
+	if m.Year == "" {
+		m.Year = info.Year
+	}
+}
+
+// enrichOMDB looks every item up concurrently (bounded by omdbWorkers),
+// queryOf giving each item's lookup. Failures only leave that item bare.
+func enrichOMDB(ctx context.Context, apiKey string, list []Media, queryOf func(i int) omdbQuery) {
+	if apiKey == "" {
+		return
+	}
+	sem := make(chan struct{}, omdbWorkers)
+	var wg sync.WaitGroup
+	for i := range list {
+		q := queryOf(i)
+		if q.empty() {
+			continue
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			info, err := omdbLookup(ctx, apiKey, q)
+			if err != nil {
+				return
+			}
+			applyOMDB(&list[i], info)
+		}()
+	}
+	wg.Wait()
 }

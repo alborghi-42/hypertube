@@ -19,6 +19,12 @@ export interface MediaDoc {
   thumbnailUrl?: string;
   thumbnail_url?: string;
   provider?: string;
+  /** Production year ("" if unknown): the provider's, else OMDb's. */
+  year?: string;
+  /** IMDb rating from OMDb; 0 or absent when unknown. */
+  imdb_rating?: number;
+  genres?: string[] | null;
+  imdb_id?: string;
 }
 
 export interface MediaDetails {

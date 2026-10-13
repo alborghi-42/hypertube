@@ -31,16 +31,18 @@ type Handler struct {
 	tx        *Transcoder
 	log       *slog.Logger
 	omdbKey   string
+	subs      *Subtitles
 }
 
 // NewHandler also sets up ffmpeg conversion (42-16) and, unless one is
 // already set, the engine's PostProcess hook caching a seekable .mp4.
-func NewHandler(store *Store, providers Registry, engine *Engine, log *slog.Logger) *Handler {
+// subs may be nil (no subtitles).
+func NewHandler(store *Store, providers Registry, engine *Engine, subs *Subtitles, log *slog.Logger) *Handler {
 	tx := NewTranscoderFromEnv(log)
 	if engine.PostProcess == nil {
 		engine.PostProcess = tx.CachePostProcess(engine)
 	}
-	return &Handler{store: store, providers: providers, engine: engine, tx: tx, log: log, omdbKey: os.Getenv("OMDB_API_KEY")}
+	return &Handler{store: store, providers: providers, engine: engine, tx: tx, log: log, omdbKey: os.Getenv("OMDB_API_KEY"), subs: subs}
 }
 
 // RegisterRoutes mounts the public movie GETs on api (the /api group, with
@@ -54,6 +56,8 @@ func (h *Handler) RegisterRoutes(api, authed, stream *gin.RouterGroup) {
 
 	// Starts a server-side download: logged-in users only.
 	authed.GET("/media/play", h.playMedia)
+	// Subtitle tracks of a media item; fetched lazily after /media/play.
+	authed.GET("/media/subtitles", h.listSubtitles)
 
 	authed.GET("/media/:mediaId/comments", h.getComments)
 	authed.GET("/media/:mediaId/comments/:commentId", h.getComment)
@@ -65,6 +69,7 @@ func (h *Handler) RegisterRoutes(api, authed, stream *gin.RouterGroup) {
 	// disk once complete (see streamMedia).
 	stream.GET("/media/:mediaId", h.streamMedia)
 	stream.HEAD("/media/:mediaId", h.streamMedia)
+	stream.GET("/media/:mediaId/subtitles/:file", h.serveSubtitle)
 }
 
 // publicURL turns a stored public_url ("stream/files/...") into a
@@ -242,23 +247,23 @@ func (h *Handler) getMediaDetails(c *gin.Context) {
 		}
 	}
 
-	h.enrichDetails(ctx, m)
+	EnrichDetails(ctx, h.store, h.omdbKey, h.log, m)
 	c.JSON(http.StatusOK, m)
 }
 
-// enrichDetails adds the OMDB fields that are not stored on the media row
+// EnrichDetails adds the OMDB fields that are not stored on the media row
 // (served from the shared OMDB cache) and persists a missing runtime.
 // Failures are logged and leave m as stored.
-func (h *Handler) enrichDetails(ctx context.Context, m *Media) {
+func EnrichDetails(ctx context.Context, store *Store, omdbKey string, log *slog.Logger, m *Media) {
 	hadDuration := m.DurationSeconds > 0
-	info, err := omdbLookup(ctx, h.omdbKey, omdbQuery{Title: m.Title, Year: m.Year})
+	info, err := omdbLookup(ctx, omdbKey, omdbQuery{Title: m.Title, Year: m.Year})
 	if err != nil {
-		h.log.Warn("OMDB details unavailable", "media_id", m.ID, "error", err)
+		log.Warn("OMDB details unavailable", "media_id", m.ID, "error", err)
 		return
 	}
 	if info == nil && m.Year != "" {
 		// The provider year can be a re-release date; retry on the title.
-		info, _ = omdbLookup(ctx, h.omdbKey, omdbQuery{Title: m.Title})
+		info, _ = omdbLookup(ctx, omdbKey, omdbQuery{Title: m.Title})
 	}
 	if info == nil {
 		return
@@ -273,8 +278,8 @@ func (h *Handler) enrichDetails(ctx context.Context, m *Media) {
 		m.Actors = stored.Actors
 	}
 	if !hadDuration && m.DurationSeconds > 0 {
-		if err := h.store.SetDuration(ctx, m.ID, m.DurationSeconds); err != nil {
-			h.log.Error("store duration failed", "media_id", m.ID, "error", err)
+		if err := store.SetDuration(ctx, m.ID, m.DurationSeconds); err != nil {
+			log.Error("store duration failed", "media_id", m.ID, "error", err)
 		}
 	}
 }
@@ -307,6 +312,7 @@ func (h *Handler) playMedia(c *gin.Context) {
 			Status:     state,
 			URL:        publicURL(path.Join(StreamPrefix, internalID)),
 			Message:    msg,
+			Subtitles:  h.subs.List(internalID),
 		})
 	}
 
@@ -328,6 +334,9 @@ func (h *Handler) playMedia(c *gin.Context) {
 		return
 	}
 	h.engine.TouchWatched(internalID)
+	// Subtitles are fetched in the background; the player polls
+	// /api/media/subtitles for tracks that arrive after this response.
+	h.subs.Ensure(*m, userLanguage(c))
 
 	// The media row now exists: record the play for the session user
 	// (42-13). Best-effort, playback does not depend on it.
@@ -432,6 +441,52 @@ func (h *Handler) streamMedia(c *gin.Context) {
 		c.Header("Content-Type", m.MimeType)
 	}
 	http.ServeContent(c.Writer, c.Request, st.Name(), st.ModTime(), f)
+}
+
+// --- subtitles ---
+
+// userLanguage is the session user's preferred language ("" if anonymous).
+func userLanguage(c *gin.Context) string {
+	if u := auth.CurrentUser(c); u != nil {
+		return u.Language
+	}
+	return ""
+}
+
+// GET /api/media/subtitles?media_id= — the cached tracks plus pending=true
+// while a background fetch runs. Also (re)starts the fetch for the
+// caller's language, so a user whose language was not fetched yet gets it.
+func (h *Handler) listSubtitles(c *gin.Context) {
+	id := c.Query("media_id")
+	if !validMediaID(id) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid media identifier"})
+		return
+	}
+	m, err := h.store.GetMedia(c.Request.Context(), id)
+	if errors.Is(err, ErrNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Media not found"})
+		return
+	}
+	if err != nil {
+		h.log.Error("media lookup failed", "media_id", id, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load media"})
+		return
+	}
+	h.subs.Ensure(*m, userLanguage(c))
+	c.JSON(http.StatusOK, gin.H{"media_id": id, "subtitles": h.subs.List(id), "pending": h.subs.Pending(id)})
+}
+
+// GET /stream/media/:mediaId/subtitles/:lang.vtt — one cached WebVTT track.
+func (h *Handler) serveSubtitle(c *gin.Context) {
+	lang, ok := strings.CutSuffix(c.Param("file"), ".vtt")
+	p, valid := h.subs.FilePath(c.Param("mediaId"), lang)
+	if !ok || !valid || !fileExists(p) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Subtitle not found"})
+		return
+	}
+	c.Header("Content-Type", "text/vtt; charset=utf-8")
+	c.Header("Cache-Control", "private, max-age=3600")
+	c.File(p)
 }
 
 // --- comments ---

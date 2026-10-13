@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -65,9 +66,21 @@ type movieResponse struct {
 	Name           string   `json:"name"`
 	ImdbRating     *float64 `json:"imdb_rating"`
 	ProductionYear *int     `json:"production_year"`
-	Length         *int     `json:"length"` // seconds
-	Subtitles      []string `json:"subtitles"`
+	Length         *int     `json:"length"`    // seconds
+	Subtitles      []string `json:"subtitles"` // cached languages (ISO 639-1), English first
 	CommentsCount  int64    `json:"comments_count"`
+	// OMDb credits, as on the movie page; empty when OMDb has no match.
+	Directors  []string `json:"directors"`
+	Writers    []string `json:"writers"`
+	Production string   `json:"production"`
+	PosterURL  string   `json:"poster_url"`
+}
+
+func nonNil(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
 }
 
 // loadMovie answers 404 itself when the movie is unknown.
@@ -101,7 +114,19 @@ func (a *API) getMovie(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, "Failed to load movie")
 		return
 	}
-	resp := movieResponse{ID: m.ID, Name: m.Title, Subtitles: []string{}, CommentsCount: count}
+	ectx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+	defer cancel()
+	media.EnrichDetails(ectx, a.store, os.Getenv("OMDB_API_KEY"), a.log, m)
+	resp := movieResponse{
+		ID:            m.ID,
+		Name:          m.Title,
+		Subtitles:     a.subs.Languages(m.ID),
+		CommentsCount: count,
+		Directors:     nonNil(m.Directors),
+		Writers:       nonNil(m.Writers),
+		Production:    m.Production,
+		PosterURL:     m.PosterURL,
+	}
 	if m.ImdbRating > 0 {
 		resp.ImdbRating = &m.ImdbRating
 	}
@@ -112,7 +137,5 @@ func (a *API) getMovie(c *gin.Context) {
 		l := int(m.DurationSeconds)
 		resp.Length = &l
 	}
-	// Subtitles: no subtitle source is wired yet; the list stays empty
-	// until one lands (languages will be listed here).
 	c.JSON(http.StatusOK, resp)
 }

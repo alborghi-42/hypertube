@@ -102,13 +102,20 @@ curl -s "$API/movies?page=1&rows=5"       # no token needed
 
 curl -s -H "$AUTH" $API/movies/a3c4...
 # 200 {"id":"a3c4...","name":"Night of the Living Dead","imdb_rating":7.8,"production_year":1968,
-#      "length":5760,"subtitles":[],"comments_count":2}
+#      "length":5760,"subtitles":["en","fr"],"comments_count":2,
+#      "directors":["George A. Romero"],"writers":["John A. Russo","George A. Romero"],
+#      "production":"Image Ten","poster_url":"https://m.media-amazon.com/images/..."}
 curl -s -i -H "$AUTH" $API/movies/00000000-0000-0000-0000-000000000000
 # 404 {"error":"Movie not found"}
 ```
 
 `length` is in seconds; `imdb_rating`, `production_year` and `length` are `null` when unknown.
 Movie ids are the ids returned by `GET /movies` (listing caches the movie).
+`subtitles` lists the languages (ISO 639-1: `en`, `fr`, `it`) of the WebVTT tracks cached for
+the movie, English first. They are fetched from OpenSubtitles the first time the movie is played
+in the web app (English, plus the viewer's language when the film is not originally in it), so a
+never-played movie has `[]`. `directors`, `writers`, `production` and `poster_url` come from OMDb
+and are empty (`[]` / `""`) when OMDb has no match.
 
 ### 4. Comments
 

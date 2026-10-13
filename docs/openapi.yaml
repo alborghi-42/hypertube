@@ -437,8 +437,19 @@ components:
         imdb_rating: { type: number, nullable: true }
         production_year: { type: integer, nullable: true }
         length: { type: integer, nullable: true, description: Seconds }
-        subtitles: { type: array, items: { type: string }, description: Available subtitle languages }
+        subtitles:
+          type: array
+          items: { type: string, enum: [en, fr, it] }
+          description: >-
+            Languages (ISO 639-1) of the WebVTT subtitles cached for the movie, English first.
+            Subtitles are fetched from OpenSubtitles when the movie is first played, so the
+            list is empty until then (or when none exist).
+          example: [en, fr]
         comments_count: { type: integer }
+        directors: { type: array, items: { type: string }, description: From OMDb; empty when unknown }
+        writers: { type: array, items: { type: string }, description: Screenplay credits from OMDb }
+        production: { type: string, description: "Production company from OMDb; empty when unknown" }
+        poster_url: { type: string, description: "OMDb poster URL; empty when unknown" }
     Comment:
       type: object
       properties:

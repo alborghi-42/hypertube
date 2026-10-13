@@ -8,7 +8,17 @@
       <span class="play-label">{{ 'player.play' | transloco }}</span>
     </button>
   } @else if (stream.value(); as s) {
-    <video class="player" [src]="s.url" controls autoplay playsinline></video>
+    <video #video class="player" [src]="s.url" controls autoplay playsinline>
+      @for (t of subtitles(); track t.lang) {
+        <track
+          kind="subtitles"
+          [attr.srclang]="t.lang"
+          [attr.label]="t.label"
+          [attr.src]="t.url"
+          [attr.default]="t.lang === defaultSubtitle() ? '' : null"
+        />
+      }
+    </video>
   } @else if (stream.error()) {
     <div class="player-state error" aria-live="assertive">
       <h3>{{ 'player.errorTitle' | transloco }}</h3>
@@ -26,6 +36,11 @@
 </div>
 @if (downloading()) {
   <p class="player-note" aria-live="polite">{{ 'player.downloading' | transloco }}</p>
+}
+@if (stream.value() && subtitles().length === 0) {
+  <p class="player-note" aria-live="polite">
+    {{ (subtitlesPending() ? 'player.subtitlesLoading' : 'player.noSubtitles') | transloco }}
+  </p>
 }
 @if (transcoded()) {
   <p class="player-note">{{ 'player.transcoded' | transloco }}</p>

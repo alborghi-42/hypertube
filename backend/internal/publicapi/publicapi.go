@@ -39,12 +39,13 @@ type API struct {
 	profiles  *auth.ProfileHandler
 	store     *media.Store
 	providers media.Registry
+	subs      *media.Subtitles
 	basePath  string // BASE_PATH, for Location headers
 	log       *slog.Logger
 }
 
-func New(db repository.DBTX, basePath string, profiles *auth.ProfileHandler, store *media.Store, providers media.Registry, log *slog.Logger) *API {
-	return &API{q: repository.New(db), profiles: profiles, store: store, providers: providers, basePath: basePath, log: log}
+func New(db repository.DBTX, basePath string, profiles *auth.ProfileHandler, store *media.Store, providers media.Registry, subs *media.Subtitles, log *slog.Logger) *API {
+	return &API{q: repository.New(db), profiles: profiles, store: store, providers: providers, subs: subs, basePath: basePath, log: log}
 }
 
 // RegisterRoutes mounts the bearer-token API on router (outside the

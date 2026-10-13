@@ -123,11 +123,18 @@ func main() {
 		)
 		// Public media GETs see the session when there is one (watched flags).
 		mediaAPI := api.Group("", sessions.Optional())
-		media.NewHandler(store, providers, engine, log).RegisterRoutes(mediaAPI, authed, stream)
+		// Subtitles (42-17): OpenSubtitles, cached under DATA_DIR/subtitles.
+		subs := media.NewSubtitles(cfg.DataDir, media.OpenSubtitlesConfig{
+			APIKey:    cfg.OpenSubtitlesAPIKey,
+			UserAgent: cfg.OpenSubtitlesUserAgent,
+			Username:  cfg.OpenSubtitlesUsername,
+			Password:  cfg.OpenSubtitlesPassword,
+		}, cfg.OMDBAPIKey, log)
+		media.NewHandler(store, providers, engine, subs, log).RegisterRoutes(mediaAPI, authed, stream)
 		go engine.RunRetention(ctx, cfg.MediaRetention) // 42-18: delete unwatched downloads
 		// Public REST API (subject III.4): OAuth2 bearer tokens on /api/v1,
 		// outside the cookie CSRF group; clients are managed on /api/auth/clients.
-		publicapi.New(pool, cfg.BasePath, profiles, store, providers, log).RegisterRoutes(router, authed)
+		publicapi.New(pool, cfg.BasePath, profiles, store, providers, subs, log).RegisterRoutes(router, authed)
 	} else {
 		log.Warn("auth and media routes disabled: they require DATABASE_URL")
 	}

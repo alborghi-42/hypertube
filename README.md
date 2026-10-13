@@ -115,6 +115,9 @@ each one). In compose, `.env` feeds both variable substitution and the backend's
 | `SMTP_USER` / `SMTP_PASSWORD` | empty | SMTP auth |
 | `SMTP_FROM` | `hypertube@localhost` | sender address |
 | `OMDB_API_KEY` | empty | optional OMDb enrichment |
+| `OPENSUBTITLES_API_KEY` | empty | OpenSubtitles consumer key; empty disables subtitles |
+| `OPENSUBTITLES_USER_AGENT` | `Hypertube v1.0` | `User-Agent` sent to OpenSubtitles (the consumer's app name + version) |
+| `OPENSUBTITLES_USERNAME` / `OPENSUBTITLES_PASSWORD` | empty | opensubtitles.com account, logged in for the download endpoint |
 | `TORRENT_LISTEN_PORT` | `6881` | peer port, TCP+UDP; `0` = random |
 | `TORRENT_NO_UPLOAD` | `false` | never upload to peers |
 | `TORRENT_SEED` | `false` | keep seeding completed files |

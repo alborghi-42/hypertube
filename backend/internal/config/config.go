@@ -34,6 +34,11 @@ type Config struct {
 	TorrentNoUpload     bool          // never upload to peers
 	TorrentSeed         bool          // keep seeding completed files
 	TorrentStallTimeout time.Duration // fail a download with no progress for this long; 0 = never
+	// OpenSubtitles REST API (subtitles); empty key disables fetching.
+	OpenSubtitlesAPIKey    string
+	OpenSubtitlesUserAgent string
+	OpenSubtitlesUsername  string // login for the download endpoint
+	OpenSubtitlesPassword  string
 	// Downloads not watched for this long are deleted from disk (42-18); 0 = never.
 	MediaRetention time.Duration
 }
@@ -60,6 +65,11 @@ func Load() Config {
 		TorrentSeed:         envBool("TORRENT_SEED", false),
 		TorrentStallTimeout: envDuration("TORRENT_STALL_TIMEOUT", 10*time.Minute),
 		MediaRetention:      envDuration("MEDIA_RETENTION", 720*time.Hour),
+
+		OpenSubtitlesAPIKey:    os.Getenv("OPENSUBTITLES_API_KEY"),
+		OpenSubtitlesUserAgent: envStr("OPENSUBTITLES_USER_AGENT", "Hypertube v1.0"),
+		OpenSubtitlesUsername:  os.Getenv("OPENSUBTITLES_USERNAME"),
+		OpenSubtitlesPassword:  os.Getenv("OPENSUBTITLES_PASSWORD"),
 	}
 }
 

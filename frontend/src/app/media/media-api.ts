@@ -53,6 +53,21 @@ export interface MediaDetails {
   imdb_id?: string;
 }
 
+/** One WebVTT subtitle track (same-origin, session-protected). */
+export interface SubtitleTrack {
+  /** ISO 639-1 code: en, fr or it. */
+  lang: string;
+  /** Endonym ("English", "Français", ...). */
+  label: string;
+  url: string;
+}
+
+export interface SubtitleList {
+  subtitles: SubtitleTrack[];
+  /** True while the server is still fetching tracks: ask again later. */
+  pending: boolean;
+}
+
 export interface MediaPlayResponse {
   internal_id?: string;
   status?: 'available' | 'ready' | 'downloading';
@@ -66,6 +81,8 @@ export interface MediaPlayResponse {
    * caches a regular .mp4 and later plays report transcoded=false (fully seekable).
    */
   transcoded?: boolean;
+  /** Tracks already cached; more may arrive via MediaApi.subtitles(). */
+  subtitles?: SubtitleTrack[];
 }
 
 interface ArchiveEnvelope {
@@ -126,10 +143,33 @@ export class MediaApi {
       return null;
     }
     const payload = (await response.json()) as MediaPlayResponse;
-    // The backend answers root-relative ("/stream/files/..."): resolve it against <base href> instead.
-    const url = payload.url?.trim().replace(/^\/+/, '') ?? '';
-    return url.length > 0 ? { ...payload, url } : null;
+    const url = relativeUrl(payload.url);
+    return url.length > 0 ? { ...payload, url, subtitles: resolveTracks(payload.subtitles) } : null;
   }
+
+  /** The subtitle tracks of a media item (by internal id); null on failure. */
+  async subtitles(mediaId: string, signal?: AbortSignal): Promise<SubtitleList | null> {
+    const params = new URLSearchParams({ media_id: mediaId });
+    const response = await fetch(`${API_BASE}/media/subtitles?${params}`, { signal }).catch(
+      () => null,
+    );
+    if (response?.ok !== true) {
+      return null;
+    }
+    const payload = (await response.json()) as Partial<SubtitleList>;
+    return { subtitles: resolveTracks(payload.subtitles), pending: payload.pending === true };
+  }
+}
+
+/** The backend answers root-relative ("/stream/..."): resolve it against <base href> instead. */
+function relativeUrl(url: string | undefined): string {
+  return url?.trim().replace(/^\/+/, '') ?? '';
+}
+
+function resolveTracks(tracks: SubtitleTrack[] | null | undefined): SubtitleTrack[] {
+  return (tracks ?? [])
+    .map((t) => ({ ...t, url: relativeUrl(t.url) }))
+    .filter((t) => t.url.length > 0 && t.lang.length > 0);
 }
 
 function extractDocs(payload: unknown): MediaDoc[] {

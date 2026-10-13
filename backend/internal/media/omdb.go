@@ -35,6 +35,7 @@ type omdbResponse struct {
 	Plot       string `json:"Plot"`
 	Poster     string `json:"Poster"`
 	Genre      string `json:"Genre"`
+	Language   string `json:"Language"`
 	Year       string `json:"Year"`
 	ImdbID     string `json:"imdbID"`
 	ImdbRating string `json:"imdbRating"`
@@ -55,6 +56,8 @@ type omdbInfo struct {
 	Runtime    float64 // seconds; 0 when unknown
 	Plot       string
 	Poster     string
+	// Languages spoken, original first ("English, French").
+	Languages []string
 }
 
 type omdbEntry struct {
@@ -166,6 +169,7 @@ func omdbFetch(ctx context.Context, apiKey string, q omdbQuery) (*omdbInfo, erro
 		Runtime:    parseRuntime(body.Runtime),
 		Plot:       omdbString(body.Plot),
 		Poster:     omdbString(body.Poster),
+		Languages:  splitOMDBList(body.Language),
 	}
 	if r, err := strconv.ParseFloat(body.ImdbRating, 64); err == nil {
 		info.Rating = r

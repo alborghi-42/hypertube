@@ -62,6 +62,8 @@ type MediaStream struct {
 	// Transcoded streams are converted on the fly (fragmented MP4): no
 	// byte-range seeking; reload the url with ?t=<seconds> to seek.
 	Transcoded bool `json:"transcoded"`
+	// Subtitles already cached; more may follow (GET /api/media/subtitles).
+	Subtitles []Subtitle `json:"subtitles"`
 }
 
 // Comment is a user comment on a media item.

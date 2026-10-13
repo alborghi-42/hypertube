@@ -103,44 +103,100 @@
   }
 }
 
-.category-row {
-  display: flex;
-  gap: 0.6rem;
-  overflow-x: auto;
-  padding-bottom: 0.2rem;
+.library-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.75rem;
+  align-items: end;
 
-  &::-webkit-scrollbar {
-    height: 6px;
+  .control {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+
+    > span,
+    legend {
+      padding: 0;
+      font-family: var(--ht-font-mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--ht-text-2);
+    }
   }
 
-  &::-webkit-scrollbar-thumb {
-    background: var(--ht-border);
+  .range {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4rem;
+
+    legend {
+      margin-bottom: 0.3rem;
+    }
+  }
+
+  select,
+  input {
+    width: 100%;
+    min-width: 0;
+    height: 2.5rem;
+    border: 1px solid var(--ht-border);
+    border-radius: 0.6rem;
+    background: var(--ht-bg-1);
+    color: var(--ht-text-0);
+    padding: 0 0.6rem;
+    font-family: var(--ht-font-mono);
+    font-size: 0.8rem;
+
+    &:focus-visible {
+      outline: none;
+      border-color: var(--ht-accent);
+      box-shadow: 0 0 0 3px oklch(from var(--ht-accent) l c h / 0.25);
+    }
+  }
+
+  .reset-btn {
+    height: 2.5rem;
+    border: 1px solid var(--ht-border);
     border-radius: 999px;
+    background: var(--ht-bg-1);
+    color: var(--ht-text-1);
+    font-family: var(--ht-font-mono);
+    font-size: 0.74rem;
+    cursor: pointer;
+    transition: all var(--ht-transition-fast);
+
+    &:hover:not(:disabled) {
+      border-color: var(--ht-accent-soft);
+      color: var(--ht-text-0);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
   }
 }
 
-.category-pill {
-  border: 1px solid var(--ht-border);
-  background: var(--ht-bg-1);
-  color: var(--ht-text-1);
-  border-radius: 999px;
-  padding: 0.45rem 0.95rem;
+.filter-summary {
+  margin: 0;
   font-family: var(--ht-font-mono);
   font-size: 0.74rem;
-  cursor: pointer;
-  transition: all var(--ht-transition-fast);
+  color: var(--ht-text-2);
+}
 
-  &:hover {
-    border-color: var(--ht-accent-soft);
-    color: var(--ht-text-0);
-    transform: translateY(-1px);
-  }
+@media (max-width: 480px) {
+  .library-controls {
+    grid-template-columns: 1fr 1fr;
 
-  &.active {
-    background: var(--ht-accent);
-    border-color: var(--ht-accent);
-    color: var(--ht-bg-0);
-    font-weight: 700;
+    .range,
+    .reset-btn {
+      grid-column: 1 / -1;
+    }
   }
 }
 

@@ -36,11 +36,31 @@ interface Video {
   /** IMDb rating, null when unknown. */
   rating: number | null;
   genres: string[];
-  category: string;
   accent: string;
   thumbnailUrl: string;
   detailsUrl: string;
 }
+
+export type SortKey = 'default' | 'name' | 'rating' | 'yearDesc' | 'yearAsc';
+
+export const SORT_KEYS: readonly SortKey[] = ['default', 'name', 'rating', 'yearDesc', 'yearAsc'];
+
+/** Library filters; null bounds and '' genre mean "any". */
+export interface LibraryFilters {
+  genre: string;
+  minRating: number | null;
+  maxRating: number | null;
+  minYear: number | null;
+  maxYear: number | null;
+}
+
+const NO_FILTERS: LibraryFilters = {
+  genre: '',
+  minRating: null,
+  maxRating: null,
+  minYear: null,
+  maxYear: null,
+};
 
 const ROWS_PER_PAGE = 24;
 const WATCH_PATH = /^\/watch\/([^/]+)$/;
@@ -76,7 +96,9 @@ export class Browse {
 
   readonly searchQuery = signal('');
   readonly debouncedSearchQuery = signal('');
-  readonly selectedCategory = signal('All');
+  readonly sortKey = signal<SortKey>('default');
+  readonly filters = signal<LibraryFilters>(NO_FILTERS);
+  readonly sortKeys = SORT_KEYS;
   readonly currentPage = signal(1);
   readonly allDocs = signal<MediaDoc[]>([]);
   readonly hasMore = signal(true);
@@ -118,7 +140,6 @@ export class Browse {
         const rawChannel = doc.provider?.trim() ?? '';
         const provider = rawChannel.length > 0 ? rawChannel : DEFAULT_PROVIDER;
         const rawTitle = doc.title?.trim() ?? '';
-        const rawCategory = doc.format?.trim() ?? '';
         return {
           id,
           title: rawTitle.length > 0 ? rawTitle : id,
@@ -129,8 +150,6 @@ export class Browse {
           rating:
             typeof doc.imdb_rating === 'number' && doc.imdb_rating > 0 ? doc.imdb_rating : null,
           genres: doc.genres ?? [],
-          category:
-            rawCategory.length > 0 ? rawCategory : this.language.t('browse.archiveCategory'),
           accent: '0.71 0.17 150',
           thumbnailUrl: doc.thumbnailUrl ?? doc.thumbnail_url ?? '',
           detailsUrl: sourceUrl(provider, id),
@@ -171,19 +190,43 @@ export class Browse {
 
   readonly selectedVideoDetails = computed(() => this.selectedVideoDetailsResource.value());
 
-  readonly categories = computed(() => [
-    'All',
-    ...new Set(this.videos().map((video) => video.category)),
-  ]);
+  /** Genres present in the loaded results, for the genre filter. */
+  readonly genres = computed(() =>
+    [...new Set(this.videos().flatMap((video) => video.genres))].sort((a, b) =>
+      a.localeCompare(b, this.language.current()),
+    ),
+  );
 
-  readonly effectiveCategory = computed(() => {
-    const category = this.selectedCategory();
-    return this.categories().includes(category) ? category : 'All';
-  });
+  readonly hasActiveFilters = computed(
+    () =>
+      this.sortKey() !== 'default' ||
+      Object.values(this.filters()).some((value) => value !== null && value !== ''),
+  );
 
+  /**
+   * Sorting and filtering run client-side on the results loaded so far: the providers page
+   * independently and only OMDb knows ratings/genres, so the backend cannot sort or filter
+   * the merged catalogue. Infinite scroll keeps loading pages (see the sentinel effect), so
+   * matches from later pages are appended and placed in order as they arrive.
+   */
   readonly filteredVideos = computed(() => {
-    const category = this.effectiveCategory();
-    return this.videos().filter((video) => category === 'All' || video.category === category);
+    const { genre, minRating, maxRating, minYear, maxYear } = this.filters();
+    const list = this.videos().filter((video) => {
+      if (genre !== '' && !video.genres.includes(genre)) return false;
+      if (minRating !== null || maxRating !== null) {
+        if (video.rating === null) return false;
+        if (minRating !== null && video.rating < minRating) return false;
+        if (maxRating !== null && video.rating > maxRating) return false;
+      }
+      if (minYear !== null || maxYear !== null) {
+        const year = Number.parseInt(video.year, 10);
+        if (Number.isNaN(year)) return false;
+        if (minYear !== null && year < minYear) return false;
+        if (maxYear !== null && year > maxYear) return false;
+      }
+      return true;
+    });
+    return sortVideos(list, this.sortKey(), this.language.current());
   });
 
   constructor() {
@@ -226,6 +269,9 @@ export class Browse {
     afterRenderEffect((onCleanup) => {
       const sentinel = this.sentinelRef()?.nativeElement;
       if (!sentinel) return;
+      // Re-observe whenever the visible list changes: a fresh observer reports the current
+      // intersection, so when filters hide most cards the next page still loads.
+      this.filteredVideos();
 
       const observer = new IntersectionObserver(
         (entries) => {
@@ -254,8 +300,28 @@ export class Browse {
     }, 250);
   }
 
-  selectCategory(category: string): void {
-    this.selectedCategory.set(category);
+  onSortChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value as SortKey;
+    this.sortKey.set(SORT_KEYS.includes(value) ? value : 'default');
+  }
+
+  onGenreChange(event: Event): void {
+    const genre = (event.target as HTMLSelectElement).value;
+    this.filters.update((f) => ({ ...f, genre }));
+  }
+
+  onRangeInput(key: Exclude<keyof LibraryFilters, 'genre'>, event: Event): void {
+    const raw = (event.target as HTMLInputElement).value.trim();
+    const value = raw === '' ? null : Number(raw);
+    this.filters.update((f) => ({
+      ...f,
+      [key]: value !== null && Number.isFinite(value) ? value : null,
+    }));
+  }
+
+  resetFilters(): void {
+    this.sortKey.set('default');
+    this.filters.set(NO_FILTERS);
   }
 
   openVideoModal(videoId: string): void {
@@ -383,6 +449,29 @@ export class Browse {
       this.mediaResource.reload();
     }
   }
+}
+
+/** Sorted copy of list; 'default' keeps the backend order. Unknown values sort last. */
+function sortVideos(list: Video[], key: SortKey, locale: string): Video[] {
+  if (key === 'default') {
+    return list;
+  }
+  const byName = (a: Video, b: Video) =>
+    a.title.localeCompare(b.title, locale, { sensitivity: 'base' });
+  const year = (video: Video) => Number.parseInt(video.year, 10);
+  const compare = (a: number, b: number, desc: boolean) => {
+    const na = Number.isNaN(a);
+    const nb = Number.isNaN(b);
+    if (na || nb) return na === nb ? 0 : na ? 1 : -1;
+    return desc ? b - a : a - b;
+  };
+  const cmp: Record<Exclude<SortKey, 'default'>, (a: Video, b: Video) => number> = {
+    name: byName,
+    rating: (a, b) => compare(a.rating ?? Number.NaN, b.rating ?? Number.NaN, true) || byName(a, b),
+    yearDesc: (a, b) => compare(year(a), year(b), true) || byName(a, b),
+    yearAsc: (a, b) => compare(year(a), year(b), false) || byName(a, b),
+  };
+  return [...list].sort(cmp[key]);
 }
 
 /** The 4-digit year at the start of a provider date, or "". */

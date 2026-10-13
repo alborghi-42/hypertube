@@ -17,18 +17,104 @@
     />
   </div>
 
-  <div class="category-row" [attr.aria-label]="'browse.categories' | transloco">
-    @for (category of categories(); track category) {
-      <button
-        type="button"
-        class="category-pill"
-        [class.active]="category === effectiveCategory()"
-        (click)="selectCategory(category)"
-      >
-        {{ category === 'All' ? ('browse.allCategory' | transloco) : category }}
-      </button>
-    }
-  </div>
+  <form
+    class="library-controls"
+    [attr.aria-label]="'browse.controls.region' | transloco"
+    (submit)="$event.preventDefault()"
+  >
+    <label class="control">
+      <span>{{ 'browse.controls.sort' | transloco }}</span>
+      <select (change)="onSortChange($event)">
+        @for (key of sortKeys; track key) {
+          <option [value]="key" [selected]="key === sortKey()">
+            {{ 'browse.sort.' + key | transloco }}
+          </option>
+        }
+      </select>
+    </label>
+
+    <label class="control">
+      <span>{{ 'browse.controls.genre' | transloco }}</span>
+      <select (change)="onGenreChange($event)">
+        <option value="" [selected]="filters().genre === ''">
+          {{ 'browse.controls.anyGenre' | transloco }}
+        </option>
+        @for (genre of genres(); track genre) {
+          <option [value]="genre" [selected]="genre === filters().genre">{{ genre }}</option>
+        }
+      </select>
+    </label>
+
+    <fieldset class="control range">
+      <legend>{{ 'browse.controls.rating' | transloco }}</legend>
+      <input
+        type="number"
+        inputmode="decimal"
+        min="0"
+        max="10"
+        step="0.5"
+        [value]="filters().minRating ?? ''"
+        (input)="onRangeInput('minRating', $event)"
+        [placeholder]="'browse.controls.min' | transloco"
+        [attr.aria-label]="'browse.controls.minRating' | transloco"
+      />
+      <input
+        type="number"
+        inputmode="decimal"
+        min="0"
+        max="10"
+        step="0.5"
+        [value]="filters().maxRating ?? ''"
+        (input)="onRangeInput('maxRating', $event)"
+        [placeholder]="'browse.controls.max' | transloco"
+        [attr.aria-label]="'browse.controls.maxRating' | transloco"
+      />
+    </fieldset>
+
+    <fieldset class="control range">
+      <legend>{{ 'browse.controls.year' | transloco }}</legend>
+      <input
+        type="number"
+        inputmode="numeric"
+        min="1880"
+        max="2100"
+        step="1"
+        [value]="filters().minYear ?? ''"
+        (input)="onRangeInput('minYear', $event)"
+        [placeholder]="'browse.controls.from' | transloco"
+        [attr.aria-label]="'browse.controls.minYear' | transloco"
+      />
+      <input
+        type="number"
+        inputmode="numeric"
+        min="1880"
+        max="2100"
+        step="1"
+        [value]="filters().maxYear ?? ''"
+        (input)="onRangeInput('maxYear', $event)"
+        [placeholder]="'browse.controls.to' | transloco"
+        [attr.aria-label]="'browse.controls.maxYear' | transloco"
+      />
+    </fieldset>
+
+    <button
+      type="button"
+      class="reset-btn"
+      [disabled]="!hasActiveFilters()"
+      (click)="resetFilters()"
+    >
+      {{ 'browse.controls.reset' | transloco }}
+    </button>
+  </form>
+
+  @if (hasActiveFilters() && allDocs().length) {
+    <p class="filter-summary" aria-live="polite">
+      {{
+        'browse.controls.summary'
+          | transloco: { shown: filteredVideos().length, loaded: videos().length }
+      }}
+    </p>
+  }
 
   @if (mediaResource.isLoading() && !allDocs().length) {
     <div class="resource-state" aria-live="polite">

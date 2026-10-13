@@ -139,9 +139,6 @@
     "searchLabel": "Rechercher des vidéos",
     "searchPlaceholder": "Rechercher sur Hypertube",
     "searchAria": "Rechercher des vidéos Hypertube",
-    "categories": "Catégories de vidéos",
-    "allCategory": "Toutes",
-    "archiveCategory": "Archive",
     "loadingTitle": "Chargement du fil...",
     "loadingBody": "Récupération du dernier catalogue de l'Internet Archive.",
     "errorTitle": "Impossible de charger le fil",
@@ -150,7 +147,7 @@
     "videoAria": "Vidéo {{title}} par {{channel}}",
     "videoDetails": "Détails de la vidéo",
     "emptyTitle": "Aucune vidéo trouvée",
-    "emptyBody": "Essayez un terme plus large ou revenez à la catégorie Toutes.",
+    "emptyBody": "Essayez une recherche plus large ou réinitialisez les filtres.",
     "loadingMoreAria": "Chargement d'autres vidéos",
     "loadingMore": "Chargement...",
     "nextPageFailed": "Impossible de charger la page suivante.",
@@ -172,7 +169,32 @@
     "imdbRating": "IMDb {{rating}}",
     "imdbRatingAria": "Note IMDb {{rating}} sur 10",
     "noRating": "Pas de note IMDb",
-    "noRatingShort": "IMDb n/d"
+    "noRatingShort": "IMDb n/d",
+    "controls": {
+      "region": "Trier et filtrer",
+      "sort": "Trier par",
+      "genre": "Genre",
+      "anyGenre": "Tous les genres",
+      "rating": "Note IMDb",
+      "min": "Min",
+      "max": "Max",
+      "minRating": "Note IMDb minimale",
+      "maxRating": "Note IMDb maximale",
+      "year": "Année",
+      "from": "De",
+      "to": "À",
+      "minYear": "À partir de l’année",
+      "maxYear": "Jusqu’à l’année",
+      "reset": "Réinitialiser",
+      "summary": "{{shown}} vidéos chargées sur {{loaded}} correspondent"
+    },
+    "sort": {
+      "default": "Par défaut",
+      "name": "Nom (A-Z)",
+      "rating": "Note IMDb",
+      "yearDesc": "Plus récents",
+      "yearAsc": "Plus anciens"
+    }
   },
   "comments": {
     "title": "Commentaires",

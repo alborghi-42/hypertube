@@ -139,9 +139,6 @@
     "searchLabel": "Search videos",
     "searchPlaceholder": "Search Hypertube",
     "searchAria": "Search Hypertube videos",
-    "categories": "Video categories",
-    "allCategory": "All",
-    "archiveCategory": "Archive",
     "loadingTitle": "Loading media feed...",
     "loadingBody": "Pulling the latest catalog from the Internet Archive.",
     "errorTitle": "Could not load media feed",
@@ -150,7 +147,7 @@
     "videoAria": "Video titled {{title}} by {{channel}}",
     "videoDetails": "Video details",
     "emptyTitle": "No videos found",
-    "emptyBody": "Try a broader search term or switch back to the All category.",
+    "emptyBody": "Try a broader search term or reset the filters.",
     "loadingMoreAria": "Loading more videos",
     "loadingMore": "Loading more...",
     "nextPageFailed": "Failed to load next page.",
@@ -172,7 +169,32 @@
     "imdbRating": "IMDb {{rating}}",
     "imdbRatingAria": "IMDb rating {{rating}} out of 10",
     "noRating": "No IMDb rating",
-    "noRatingShort": "IMDb n/a"
+    "noRatingShort": "IMDb n/a",
+    "controls": {
+      "region": "Sort and filter",
+      "sort": "Sort by",
+      "genre": "Genre",
+      "anyGenre": "All genres",
+      "rating": "IMDb rating",
+      "min": "Min",
+      "max": "Max",
+      "minRating": "Minimum IMDb rating",
+      "maxRating": "Maximum IMDb rating",
+      "year": "Year",
+      "from": "From",
+      "to": "To",
+      "minYear": "From year",
+      "maxYear": "To year",
+      "reset": "Reset",
+      "summary": "{{shown}} of {{loaded}} loaded videos match"
+    },
+    "sort": {
+      "default": "Default",
+      "name": "Name (A-Z)",
+      "rating": "IMDb rating",
+      "yearDesc": "Newest first",
+      "yearAsc": "Oldest first"
+    }
   },
   "comments": {
     "title": "Comments",

@@ -139,9 +139,6 @@
     "searchLabel": "Cerca video",
     "searchPlaceholder": "Cerca su Hypertube",
     "searchAria": "Cerca video su Hypertube",
-    "categories": "Categorie video",
-    "allCategory": "Tutti",
-    "archiveCategory": "Archivio",
     "loadingTitle": "Caricamento feed...",
     "loadingBody": "Recupero dell'ultimo catalogo dall'Internet Archive.",
     "errorTitle": "Impossibile caricare il feed",
@@ -150,7 +147,7 @@
     "videoAria": "Video {{title}} di {{channel}}",
     "videoDetails": "Dettagli video",
     "emptyTitle": "Nessun video trovato",
-    "emptyBody": "Prova un termine di ricerca più ampio o torna alla categoria Tutti.",
+    "emptyBody": "Prova una ricerca più ampia o azzera i filtri.",
     "loadingMoreAria": "Caricamento di altri video",
     "loadingMore": "Caricamento...",
     "nextPageFailed": "Impossibile caricare la pagina successiva.",
@@ -172,7 +169,32 @@
     "imdbRating": "IMDb {{rating}}",
     "imdbRatingAria": "Voto IMDb {{rating}} su 10",
     "noRating": "Nessun voto IMDb",
-    "noRatingShort": "IMDb n/d"
+    "noRatingShort": "IMDb n/d",
+    "controls": {
+      "region": "Ordina e filtra",
+      "sort": "Ordina per",
+      "genre": "Genere",
+      "anyGenre": "Tutti i generi",
+      "rating": "Voto IMDb",
+      "min": "Min",
+      "max": "Max",
+      "minRating": "Voto IMDb minimo",
+      "maxRating": "Voto IMDb massimo",
+      "year": "Anno",
+      "from": "Dal",
+      "to": "Al",
+      "minYear": "Dall’anno",
+      "maxYear": "All’anno",
+      "reset": "Azzera",
+      "summary": "{{shown}} video caricati su {{loaded}} corrispondono"
+    },
+    "sort": {
+      "default": "Predefinito",
+      "name": "Nome (A-Z)",
+      "rating": "Voto IMDb",
+      "yearDesc": "Più recenti",
+      "yearAsc": "Meno recenti"
+    }
   },
   "comments": {
     "title": "Commenti",

@@ -30,7 +30,13 @@ Ported from the Clashboard `media-service`. Media routes are only mounted when `
 | `GET/POST /api/media/:mediaId/comments`, `GET/PATCH/DELETE /api/media/:mediaId/comments/:commentId` | Comments (no auth yet: placeholder author, no ownership check) |
 | `GET /stream/files/<provider>/<file>` | Downloaded files (Range requests supported), stored under `$DATA_DIR/downloads` |
 
-`provider` defaults to `archive.org`. `OMDB_API_KEY` (optional) adds IMDb rating/actors.
+`provider` defaults to `archive.org`. `OMDB_API_KEY` (optional) adds IMDb rating, genres and actors
+(looked up by IMDb id, else title + year; cached in memory for 24h).
+
+Library sort (name, IMDb rating, year) and filters (genre, rating range, year range) run in the
+browser over the results loaded so far: providers page independently and ratings/genres come from
+OMDb, so the merged catalogue cannot be sorted server-side. Infinite scroll keeps loading pages
+while the filtered list is short, and new matches slot into the chosen order.
 
 Frontend: `/` is the browse feed, `/watch/:id` opens the player for an item.
 

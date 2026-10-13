@@ -17,6 +17,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 
 import { AuthService } from '../auth/auth.service';
 
+import { MediaComments } from '../media/comments/media-comments';
 import { DEFAULT_PROVIDER, MediaApi, type MediaDetails, type MediaDoc, type MediaListParams } from '../media/media-api';
 
 interface Video {
@@ -41,6 +42,7 @@ const WATCH_PATH = /^\/watch\/([^/]+)$/;
  */
 @Component({
   selector: 'app-browse',
+  imports: [MediaComments],
   templateUrl: './browse.html',
   styleUrl: './browse.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -8,15 +8,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-)
 
-// placeholderUserID is used as the comment author until authentication (M1)
-// exists. Carried over from the original service.
-// TODO(M1): use the authenticated user ID and enforce ownership on PATCH/DELETE.
-const placeholderUserID = "c8fa8d7a-6073-5799-9c92-31eb050741ad"
+	"github.com/alborghi-42/hypertube/backend/internal/auth"
+	"github.com/alborghi-42/hypertube/backend/internal/repository"
+)
 
 const defaultProvider = "archive.org"
 
@@ -310,19 +309,73 @@ func (h *Handler) getComment(c *gin.Context) {
 	c.JSON(http.StatusOK, comment)
 }
 
-func (h *Handler) postComment(c *gin.Context) {
+// bindComment reads and validates the comment body: non-empty after trimming
+// and at most MaxCommentLength characters. Writes the 400 itself.
+func bindComment(c *gin.Context) (string, bool) {
 	var req commentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return "", false
+	}
+	content := strings.TrimSpace(req.Content)
+	if content == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Comment cannot be empty"})
+		return "", false
+	}
+	if utf8.RuneCountInString(content) > MaxCommentLength {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Comment is too long", "max_length": MaxCommentLength})
+		return "", false
+	}
+	return content, true
+}
+
+// sessionUser returns the logged-in user. The comment routes sit behind
+// sessions.Require(), so a missing user is a wiring bug; answer 401 anyway.
+func sessionUser(c *gin.Context) (*repository.User, bool) {
+	u := auth.CurrentUser(c)
+	if u == nil || !u.ID.Valid {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
+		return nil, false
+	}
+	return u, true
+}
+
+// ownComment loads the comment in the URL and checks the caller wrote it:
+// 404 if it does not exist on this media, 403 if it belongs to someone else.
+func (h *Handler) ownComment(ctx context.Context, c *gin.Context, u *repository.User) bool {
+	comment, err := h.store.GetComment(ctx, c.Param("commentId"))
+	if err != nil {
+		h.commentError(c, err, "Failed to fetch comment")
+		return false
+	}
+	if comment.MediaID != c.Param("mediaId") {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Comment not found"})
+		return false
+	}
+	if comment.UserID != fromUUID(u.ID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You can only modify your own comments"})
+		return false
+	}
+	return true
+}
+
+func (h *Handler) postComment(c *gin.Context) {
+	u, ok := sessionUser(c)
+	if !ok {
+		return
+	}
+	content, ok := bindComment(c)
+	if !ok {
 		return
 	}
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
 	created, err := h.store.CreateComment(ctx, &Comment{
-		ID:      uuid.NewString(),
-		MediaID: c.Param("mediaId"),
-		UserID:  placeholderUserID,
-		Content: req.Content,
+		ID:       uuid.NewString(),
+		MediaID:  c.Param("mediaId"),
+		UserID:   fromUUID(u.ID),
+		Username: u.Username,
+		Content:  content,
 	})
 	if err != nil {
 		h.commentError(c, err, "Failed to create comment")
@@ -331,17 +384,21 @@ func (h *Handler) postComment(c *gin.Context) {
 	c.JSON(http.StatusCreated, created)
 }
 
-// SECURITY: no ownership check on PATCH/DELETE — there is no authenticated
-// identity yet (see placeholderUserID). Same as the original service.
 func (h *Handler) patchComment(c *gin.Context) {
-	var req commentRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+	u, ok := sessionUser(c)
+	if !ok {
+		return
+	}
+	content, ok := bindComment(c)
+	if !ok {
 		return
 	}
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
-	updated, err := h.store.UpdateComment(ctx, c.Param("commentId"), c.Param("mediaId"), req.Content)
+	if !h.ownComment(ctx, c, u) {
+		return
+	}
+	updated, err := h.store.UpdateComment(ctx, c.Param("commentId"), c.Param("mediaId"), u.ID, u.Username, content)
 	if err != nil {
 		h.commentError(c, err, "Failed to update comment")
 		return
@@ -350,9 +407,16 @@ func (h *Handler) patchComment(c *gin.Context) {
 }
 
 func (h *Handler) deleteComment(c *gin.Context) {
+	u, ok := sessionUser(c)
+	if !ok {
+		return
+	}
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
-	if err := h.store.DeleteComment(ctx, c.Param("commentId"), c.Param("mediaId")); err != nil {
+	if !h.ownComment(ctx, c, u) {
+		return
+	}
+	if err := h.store.DeleteComment(ctx, c.Param("commentId"), c.Param("mediaId"), u.ID); err != nil {
 		h.commentError(c, err, "Failed to delete comment")
 		return
 	}

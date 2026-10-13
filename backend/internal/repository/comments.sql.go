@@ -44,16 +44,17 @@ func (q *Queries) CreateComment(ctx context.Context, arg CreateCommentParams) (M
 }
 
 const deleteComment = `-- name: DeleteComment :execrows
-DELETE FROM media_comments WHERE comment_id = $1 AND media_id = $2
+DELETE FROM media_comments WHERE comment_id = $1 AND media_id = $2 AND user_id = $3
 `
 
 type DeleteCommentParams struct {
 	CommentID pgtype.UUID
 	MediaID   pgtype.UUID
+	UserID    pgtype.UUID
 }
 
 func (q *Queries) DeleteComment(ctx context.Context, arg DeleteCommentParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteComment, arg.CommentID, arg.MediaID)
+	result, err := q.db.Exec(ctx, deleteComment, arg.CommentID, arg.MediaID, arg.UserID)
 	if err != nil {
 		return 0, err
 	}
@@ -61,12 +62,25 @@ func (q *Queries) DeleteComment(ctx context.Context, arg DeleteCommentParams) (i
 }
 
 const getComment = `-- name: GetComment :one
-SELECT comment_id, media_id, user_id, content, created_at, updated_at FROM media_comments WHERE comment_id = $1
+SELECT c.comment_id, c.media_id, c.user_id, c.content, c.created_at, c.updated_at, u.username
+FROM media_comments c
+JOIN users u ON u.id = c.user_id
+WHERE c.comment_id = $1
 `
 
-func (q *Queries) GetComment(ctx context.Context, commentID pgtype.UUID) (MediaComment, error) {
+type GetCommentRow struct {
+	CommentID pgtype.UUID
+	MediaID   pgtype.UUID
+	UserID    pgtype.UUID
+	Content   string
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+	Username  string
+}
+
+func (q *Queries) GetComment(ctx context.Context, commentID pgtype.UUID) (GetCommentRow, error) {
 	row := q.db.QueryRow(ctx, getComment, commentID)
-	var i MediaComment
+	var i GetCommentRow
 	err := row.Scan(
 		&i.CommentID,
 		&i.MediaID,
@@ -74,23 +88,38 @@ func (q *Queries) GetComment(ctx context.Context, commentID pgtype.UUID) (MediaC
 		&i.Content,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Username,
 	)
 	return i, err
 }
 
 const listCommentsByMedia = `-- name: ListCommentsByMedia :many
-SELECT comment_id, media_id, user_id, content, created_at, updated_at FROM media_comments WHERE media_id = $1 ORDER BY created_at DESC
+SELECT c.comment_id, c.media_id, c.user_id, c.content, c.created_at, c.updated_at, u.username
+FROM media_comments c
+JOIN users u ON u.id = c.user_id
+WHERE c.media_id = $1
+ORDER BY c.created_at DESC
 `
 
-func (q *Queries) ListCommentsByMedia(ctx context.Context, mediaID pgtype.UUID) ([]MediaComment, error) {
+type ListCommentsByMediaRow struct {
+	CommentID pgtype.UUID
+	MediaID   pgtype.UUID
+	UserID    pgtype.UUID
+	Content   string
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+	Username  string
+}
+
+func (q *Queries) ListCommentsByMedia(ctx context.Context, mediaID pgtype.UUID) ([]ListCommentsByMediaRow, error) {
 	rows, err := q.db.Query(ctx, listCommentsByMedia, mediaID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []MediaComment
+	var items []ListCommentsByMediaRow
 	for rows.Next() {
-		var i MediaComment
+		var i ListCommentsByMediaRow
 		if err := rows.Scan(
 			&i.CommentID,
 			&i.MediaID,
@@ -98,6 +127,7 @@ func (q *Queries) ListCommentsByMedia(ctx context.Context, mediaID pgtype.UUID) 
 			&i.Content,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Username,
 		); err != nil {
 			return nil, err
 		}
@@ -111,19 +141,27 @@ func (q *Queries) ListCommentsByMedia(ctx context.Context, mediaID pgtype.UUID) 
 
 const updateComment = `-- name: UpdateComment :one
 UPDATE media_comments
-SET content = $3, updated_at = now()
-WHERE comment_id = $1 AND media_id = $2
+SET content = $4, updated_at = now()
+WHERE comment_id = $1 AND media_id = $2 AND user_id = $3
 RETURNING comment_id, media_id, user_id, content, created_at, updated_at
 `
 
 type UpdateCommentParams struct {
 	CommentID pgtype.UUID
 	MediaID   pgtype.UUID
+	UserID    pgtype.UUID
 	Content   string
 }
 
+// Update/delete are also scoped to the author, so the write itself can never
+// touch someone else's comment whatever the handler checked before.
 func (q *Queries) UpdateComment(ctx context.Context, arg UpdateCommentParams) (MediaComment, error) {
-	row := q.db.QueryRow(ctx, updateComment, arg.CommentID, arg.MediaID, arg.Content)
+	row := q.db.QueryRow(ctx, updateComment,
+		arg.CommentID,
+		arg.MediaID,
+		arg.UserID,
+		arg.Content,
+	)
 	var i MediaComment
 	err := row.Scan(
 		&i.CommentID,

@@ -1,0 +1,126 @@
+:host {
+  display: block;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.comments {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  margin-top: 1rem;
+
+  h3 {
+    margin: 0;
+    font-family: var(--ht-font-display);
+    color: var(--ht-text-0);
+  }
+}
+
+textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.6rem;
+  border: 1px solid var(--ht-border);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-bg-1);
+  color: var(--ht-text-0);
+  font: inherit;
+  resize: vertical;
+
+  &:focus {
+    outline: none;
+    border-color: var(--ht-accent);
+  }
+}
+
+button {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--ht-border-bold);
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+  color: var(--ht-text-1);
+  font: inherit;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    color: var(--ht-text-0);
+    border-color: var(--ht-accent);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.comment-form-footer,
+.comment-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.comment-counter {
+  margin-right: auto;
+  font-family: var(--ht-font-mono);
+  color: var(--ht-text-2);
+
+  &.over {
+    color: oklch(0.65 0.2 25);
+  }
+}
+
+.comment-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.comment {
+  padding: 0.7rem;
+  border: 1px solid var(--ht-border);
+  border-radius: var(--ht-radius-sm);
+}
+
+.comment-meta {
+  display: flex;
+  gap: 0.6rem;
+  margin: 0 0 0.3rem;
+  font-family: var(--ht-font-mono);
+  font-size: 0.85em;
+  color: var(--ht-text-2);
+}
+
+.comment-author {
+  color: var(--ht-accent);
+}
+
+.comment-content {
+  margin: 0;
+  color: var(--ht-text-0);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.comment-status {
+  margin: 0;
+  color: var(--ht-text-2);
+}
+
+.comment-error {
+  margin: 0;
+  color: oklch(0.65 0.2 25);
+}

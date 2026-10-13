@@ -1,0 +1,1 @@
+ALTER TABLE media_comments DROP CONSTRAINT media_comments_user_id_fkey;

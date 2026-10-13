@@ -51,10 +51,15 @@ type Comment struct {
 	ID        string    `json:"id"`
 	MediaID   string    `json:"media_id"`
 	UserID    string    `json:"user_id"`
+	Username  string    `json:"username"`
 	Content   string    `json:"content"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
+
+// MaxCommentLength is the longest comment accepted, in characters (runes),
+// counted after trimming surrounding whitespace.
+const MaxCommentLength = 1000
 
 type commentRequest struct {
 	Content string `json:"content" binding:"required"`

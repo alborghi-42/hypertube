@@ -1,0 +1,75 @@
+<section class="comments" aria-label="Comments">
+  <h3>Comments</h3>
+
+  <form class="comment-form" (submit)="post(); $event.preventDefault()">
+    <label class="sr-only" for="comment-draft">Write a comment</label>
+    <textarea
+      id="comment-draft"
+      rows="3"
+      placeholder="Write a comment"
+      [value]="draft()"
+      [attr.maxlength]="maxLength"
+      (input)="onDraftInput($event)"
+    ></textarea>
+    <div class="comment-form-footer">
+      <span class="comment-counter" [class.over]="remaining(draft()) < 0">{{
+        remaining(draft())
+      }}</span>
+      <button type="submit" [disabled]="!canPost()">Post</button>
+    </div>
+  </form>
+
+  @if (actionError(); as error) {
+    <p class="comment-error" role="alert">{{ error }}</p>
+  }
+
+  @if (commentsResource.isLoading() && !comments().length) {
+    <p class="comment-status">Loading comments...</p>
+  } @else if (commentsResource.error()) {
+    <p class="comment-status">Could not load comments.</p>
+  } @else {
+    <ul class="comment-list">
+      @for (comment of comments(); track comment.id) {
+        <li class="comment">
+          <p class="comment-meta">
+            <span class="comment-author">{{ comment.username }}</span>
+            <span>{{ formatDate(comment.created_at) }}</span>
+            @if (comment.updated_at !== comment.created_at) {
+              <span>(edited)</span>
+            }
+          </p>
+
+          @if (editingId() === comment.id) {
+            <label class="sr-only" [for]="'comment-edit-' + comment.id">Edit comment</label>
+            <textarea
+              [id]="'comment-edit-' + comment.id"
+              rows="3"
+              [value]="editDraft()"
+              [attr.maxlength]="maxLength"
+              (input)="onEditInput($event)"
+            ></textarea>
+            <div class="comment-actions">
+              <span class="comment-counter" [class.over]="remaining(editDraft()) < 0">{{
+                remaining(editDraft())
+              }}</span>
+              <button type="button" [disabled]="!canSaveEdit()" (click)="saveEdit(comment)">
+                Save
+              </button>
+              <button type="button" (click)="cancelEdit()">Cancel</button>
+            </div>
+          } @else {
+            <p class="comment-content">{{ comment.content }}</p>
+            @if (isOwn(comment)) {
+              <div class="comment-actions">
+                <button type="button" [disabled]="busy()" (click)="startEdit(comment)">Edit</button>
+                <button type="button" [disabled]="busy()" (click)="remove(comment)">Delete</button>
+              </div>
+            }
+          }
+        </li>
+      } @empty {
+        <li class="comment-status">No comments yet.</li>
+      }
+    </ul>
+  }
+</section>

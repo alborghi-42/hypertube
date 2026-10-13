@@ -79,11 +79,14 @@ func mediaFromRow(r repository.Medium) *Media {
 	}
 }
 
-func commentFromRow(r repository.MediaComment) *Comment {
+// commentFromRow maps a bare comment row; username is the author's, known by
+// the caller (writes are always made by the session user).
+func commentFromRow(r repository.MediaComment, username string) *Comment {
 	return &Comment{
 		ID:        fromUUID(r.CommentID),
 		MediaID:   fromUUID(r.MediaID),
 		UserID:    fromUUID(r.UserID),
+		Username:  username,
 		Content:   r.Content,
 		CreatedAt: r.CreatedAt.Time,
 		UpdatedAt: r.UpdatedAt.Time,
@@ -173,7 +176,10 @@ func (s *Store) ListComments(ctx context.Context, mediaID string) ([]Comment, er
 	}
 	out := make([]Comment, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, *commentFromRow(r))
+		out = append(out, *commentFromRow(repository.MediaComment{
+			CommentID: r.CommentID, MediaID: r.MediaID, UserID: r.UserID,
+			Content: r.Content, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+		}, r.Username))
 	}
 	return out, nil
 }
@@ -181,15 +187,19 @@ func (s *Store) ListComments(ctx context.Context, mediaID string) ([]Comment, er
 func (s *Store) GetComment(ctx context.Context, commentID string) (*Comment, error) {
 	uid, err := toUUID(commentID)
 	if err != nil {
-		return nil, err
+		return nil, ErrNotFound
 	}
-	row, err := s.q.GetComment(ctx, uid)
+	r, err := s.q.GetComment(ctx, uid)
 	if err != nil {
 		return nil, notFound(err)
 	}
-	return commentFromRow(row), nil
+	return commentFromRow(repository.MediaComment{
+		CommentID: r.CommentID, MediaID: r.MediaID, UserID: r.UserID,
+		Content: r.Content, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+	}, r.Username), nil
 }
 
+// CreateComment inserts c; c.Username is echoed back as the author's name.
 func (s *Store) CreateComment(ctx context.Context, c *Comment) (*Comment, error) {
 	cid, err := toUUID(c.ID)
 	if err != nil {
@@ -209,10 +219,12 @@ func (s *Store) CreateComment(ctx context.Context, c *Comment) (*Comment, error)
 	if err != nil {
 		return nil, err
 	}
-	return commentFromRow(row), nil
+	return commentFromRow(row, c.Username), nil
 }
 
-func (s *Store) UpdateComment(ctx context.Context, commentID, mediaID, content string) (*Comment, error) {
+// UpdateComment changes the content of a comment owned by author; it returns
+// ErrNotFound when no such comment exists for that author.
+func (s *Store) UpdateComment(ctx context.Context, commentID, mediaID string, author pgtype.UUID, authorName, content string) (*Comment, error) {
 	cid, err := toUUID(commentID)
 	if err != nil {
 		return nil, err
@@ -222,15 +234,16 @@ func (s *Store) UpdateComment(ctx context.Context, commentID, mediaID, content s
 		return nil, err
 	}
 	row, err := s.q.UpdateComment(ctx, repository.UpdateCommentParams{
-		CommentID: cid, MediaID: mid, Content: content,
+		CommentID: cid, MediaID: mid, UserID: author, Content: content,
 	})
 	if err != nil {
 		return nil, notFound(err)
 	}
-	return commentFromRow(row), nil
+	return commentFromRow(row, authorName), nil
 }
 
-func (s *Store) DeleteComment(ctx context.Context, commentID, mediaID string) error {
+// DeleteComment removes a comment owned by author; ErrNotFound otherwise.
+func (s *Store) DeleteComment(ctx context.Context, commentID, mediaID string, author pgtype.UUID) error {
 	cid, err := toUUID(commentID)
 	if err != nil {
 		return err
@@ -239,7 +252,7 @@ func (s *Store) DeleteComment(ctx context.Context, commentID, mediaID string) er
 	if err != nil {
 		return err
 	}
-	n, err := s.q.DeleteComment(ctx, repository.DeleteCommentParams{CommentID: cid, MediaID: mid})
+	n, err := s.q.DeleteComment(ctx, repository.DeleteCommentParams{CommentID: cid, MediaID: mid, UserID: author})
 	if err != nil {
 		return err
 	}

@@ -153,6 +153,10 @@
                   formatDuration(details.duration_seconds)
                 }}</span>
               </div>
+
+              @if (details.id; as mediaId) {
+                <app-media-comments [mediaId]="mediaId" />
+              }
             }
           </section>
         </section>

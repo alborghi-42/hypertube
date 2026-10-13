@@ -76,11 +76,18 @@ export interface MediaPlayResponse {
   /**
    * True when the backend converts the file on the fly (mkv, avi, ...) to fragmented MP4.
    * Such streams are not byte-range seekable: the native scrubber only works inside the
-   * buffered part. To jump elsewhere, reload the url with `?t=<seconds>` (the new stream
-   * then starts at that offset with currentTime 0). Once the download finishes the server
-   * caches a regular .mp4 and later plays report transcoded=false (fully seekable).
+   * buffered part. To jump elsewhere, reload the url with `?t=<seconds>` (the server shifts
+   * the output timestamps by that offset, so currentTime should stay absolute; the player
+   * checks it). Once the download finishes the server caches a regular .mp4 and later plays
+   * report transcoded=false (fully seekable).
    */
   transcoded?: boolean;
+  /**
+   * `?quality=` values of the url: "original" first, then downscaled renditions (720p, 480p,
+   * 360p) below the source height. Non-original ones are encoded on the fly like transcoded
+   * streams (seek with `?t=`).
+   */
+  qualities?: string[];
   /** Tracks already cached; more may arrive via MediaApi.subtitles(). */
   subtitles?: SubtitleTrack[];
 }

@@ -8,9 +8,21 @@
       <span class="play-label">{{ 'player.play' | transloco }}</span>
     </button>
   } @else if (stream.value(); as s) {
-    <video #video class="player" [src]="s.url" controls autoplay playsinline>
+    <video
+      #video
+      class="player"
+      [src]="src()"
+      controls
+      autoplay
+      playsinline
+      (loadedmetadata)="onLoadedMetadata()"
+      (timeupdate)="onTimeUpdate()"
+      (seeking)="onSeeking()"
+      (error)="onVideoError()"
+    >
       @for (t of subtitles(); track t.lang) {
         <track
+          (load)="onTrackLoad($event)"
           kind="subtitles"
           [attr.srclang]="t.lang"
           [attr.label]="t.label"
@@ -19,6 +31,20 @@
         />
       }
     </video>
+    @if (qualities().length > 1) {
+      <div class="player-bar">
+        <label class="quality">
+          <span>{{ 'player.quality' | transloco }}</span>
+          <select [value]="quality()" (change)="selectQuality($any($event.target).value)">
+            @for (q of qualities(); track q) {
+              <option [value]="q" [selected]="q === quality()">
+                {{ q === 'original' ? ('player.qualityOriginal' | transloco) : q }}
+              </option>
+            }
+          </select>
+        </label>
+      </div>
+    }
   } @else if (stream.error()) {
     <div class="player-state error" aria-live="assertive">
       <h3>{{ 'player.errorTitle' | transloco }}</h3>
@@ -42,6 +68,9 @@
     {{ (subtitlesPending() ? 'player.subtitlesLoading' : 'player.noSubtitles') | transloco }}
   </p>
 }
-@if (transcoded()) {
+@if (streamFailed()) {
+  <p class="player-note" aria-live="assertive">{{ 'player.qualityBusy' | transloco }}</p>
+}
+@if (serverSeek()) {
   <p class="player-note">{{ 'player.transcoded' | transloco }}</p>
 }

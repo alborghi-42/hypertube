@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -30,7 +31,48 @@ const (
 	probeHeadBytes       = 16 << 20 // head of a downloading file fed to ffprobe
 	probeTimeout         = 30 * time.Second
 	stderrKeep           = 4 << 10
+	// Threads per downscaled encode (42-25), so a few viewers cannot take
+	// every core of the shared box. Override with SCALE_THREADS.
+	defaultScaleThreads = 4
 )
+
+// QualityOriginal is the untouched path of ?quality= (42-25): range
+// streaming, or the plain transcode for mkv & co.
+const QualityOriginal = "original"
+
+// qualityHeights is the allow-list of downscaled renditions, highest first.
+var qualityHeights = []struct {
+	Name   string
+	Height int
+}{{"720p", 720}, {"480p", 480}, {"360p", 360}}
+
+// QualityHeight returns the target height of a ?quality= value: 0 for
+// original (or empty), false for anything not in the allow-list.
+func QualityHeight(q string) (int, bool) {
+	if q == "" || q == QualityOriginal {
+		return 0, true
+	}
+	for _, v := range qualityHeights {
+		if v.Name == q {
+			return v.Height, true
+		}
+	}
+	return 0, false
+}
+
+// qualitiesFor lists original plus the renditions strictly lower than the
+// source height. With an unknown height (0) every rendition is offered:
+// the scale filter never upscales, so a too-high pick just re-encodes at
+// the source size.
+func qualitiesFor(height int) []string {
+	out := []string{QualityOriginal}
+	for _, v := range qualityHeights {
+		if height == 0 || v.Height < height {
+			out = append(out, v.Name)
+		}
+	}
+	return out
+}
 
 // Transcoder runs ffprobe/ffmpeg with a cap on concurrent live transcodes.
 type Transcoder struct {
@@ -38,6 +80,9 @@ type Transcoder struct {
 	ffprobe string
 	slots   chan struct{} // live streams
 	cache   chan struct{} // background full conversions (one at a time)
+	threads int           // -threads for downscaled encodes
+	heights sync.Map      // media id -> source video height (int), probed once
+	probing sync.Map      // media id -> struct{}: background head probe running
 	log     *slog.Logger
 }
 
@@ -58,8 +103,12 @@ func NewTranscoderFromEnv(log *slog.Logger) *Transcoder {
 	if v, err := strconv.Atoi(os.Getenv("MAX_TRANSCODES")); err == nil && v > 0 {
 		n = v
 	}
+	threads := defaultScaleThreads
+	if v, err := strconv.Atoi(os.Getenv("SCALE_THREADS")); err == nil && v >= 0 {
+		threads = v
+	}
 	return &Transcoder{
-		ffmpeg: ffmpeg, ffprobe: ffprobe, log: log,
+		ffmpeg: ffmpeg, ffprobe: ffprobe, log: log, threads: threads,
 		slots: make(chan struct{}, n), cache: make(chan struct{}, 1),
 	}
 }
@@ -71,10 +120,12 @@ func envOr(key, def string) string {
 	return def
 }
 
-// probeResult holds the codecs of the first video and audio streams.
+// probeResult holds the codecs of the first video and audio streams and
+// the height of the video one (0 if unknown).
 type probeResult struct {
-	Video string
-	Audio string
+	Video  string
+	Audio  string
+	Height int
 }
 
 // probe runs ffprobe on a file path, or on stdin fed from head when path is "".
@@ -87,7 +138,7 @@ func (t *Transcoder) probe(ctx context.Context, file string, head io.Reader) (pr
 		in = "pipe:0"
 	}
 	cmd := exec.CommandContext(ctx, t.ffprobe, "-v", "error",
-		"-show_entries", "stream=codec_type,codec_name", "-of", "json", "-i", in)
+		"-show_entries", "stream=codec_type,codec_name,height", "-of", "json", "-i", in)
 	if file == "" {
 		cmd.Stdin = head
 	}
@@ -98,6 +149,7 @@ func (t *Transcoder) probe(ctx context.Context, file string, head io.Reader) (pr
 		Streams []struct {
 			CodecType string `json:"codec_type"`
 			CodecName string `json:"codec_name"`
+			Height    int    `json:"height"`
 		} `json:"streams"`
 	}
 	// ffprobe on a truncated head may exit non-zero but still print streams.
@@ -111,6 +163,7 @@ func (t *Transcoder) probe(ctx context.Context, file string, head io.Reader) (pr
 		switch {
 		case s.CodecType == "video" && res.Video == "":
 			res.Video = s.CodecName
+			res.Height = s.Height
 		case s.CodecType == "audio" && res.Audio == "":
 			res.Audio = s.CodecName
 		}
@@ -119,16 +172,32 @@ func (t *Transcoder) probe(ctx context.Context, file string, head io.Reader) (pr
 }
 
 // ffmpegArgs builds the conversion command line. in is a path or "pipe:0";
-// out is a path or "pipe:1".
-func ffmpegArgs(in, out string, start float64, pr probeResult, fragmented bool) []string {
+// out is a path or "pipe:1". height > 0 downscales to that height (42-25,
+// never upscaling) with threads encoder threads (0 = ffmpeg default).
+//
+// With a start offset the output timestamps are shifted forward by start
+// (-output_ts_offset), so the fragmented stream carries the film's absolute
+// timeline and subtitle cues line up; the player still checks what the
+// browser exposes and shifts the cues itself if it rebased to 0.
+func ffmpegArgs(in, out string, start float64, pr probeResult, fragmented bool, height, threads int) []string {
 	args := []string{"-hide_banner", "-loglevel", "error", "-nostdin"}
+	ss := ""
 	if start > 0 {
-		args = append(args, "-ss", strconv.FormatFloat(start, 'f', 3, 64))
+		ss = strconv.FormatFloat(start, 'f', 3, 64)
+		args = append(args, "-ss", ss)
 	}
 	args = append(args, "-i", in, "-map", "0:v:0", "-map", "0:a:0?", "-sn", "-dn")
-	if pr.Video == "h264" {
+	switch {
+	case height > 0:
+		args = append(args,
+			"-vf", fmt.Sprintf("scale=-2:'min(%d,ih)'", height),
+			"-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p")
+		if threads > 0 {
+			args = append(args, "-threads", strconv.Itoa(threads))
+		}
+	case pr.Video == "h264":
 		args = append(args, "-c:v", "copy")
-	} else {
+	default:
 		args = append(args, "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p")
 	}
 	switch pr.Audio {
@@ -136,6 +205,9 @@ func ffmpegArgs(in, out string, start float64, pr probeResult, fragmented bool) 
 		args = append(args, "-c:a", "copy")
 	default:
 		args = append(args, "-c:a", "aac", "-b:a", "160k", "-ac", "2")
+	}
+	if ss != "" && fragmented {
+		args = append(args, "-output_ts_offset", ss)
 	}
 	if fragmented {
 		args = append(args, "-movflags", "frag_keyframe+empty_moov+default_base_moof")
@@ -148,8 +220,9 @@ func ffmpegArgs(in, out string, start float64, pr probeResult, fragmented bool) 
 // Stream transcodes to fragmented MP4 on the response. Input is the file on
 // disk (file != "") or src, a reader that blocks until torrent pieces arrive.
 // openHead returns a fresh reader on the source head for probing (nil when
-// file is set). ffmpeg is killed when the request context ends.
-func (t *Transcoder) Stream(c *gin.Context, file string, src io.Reader, openHead func() io.ReadCloser) {
+// file is set). ffmpeg is killed when the request context ends. height > 0
+// downscales (42-25); mediaID keys the cached probe result.
+func (t *Transcoder) Stream(c *gin.Context, mediaID string, height int, file string, src io.Reader, openHead func() io.ReadCloser) {
 	start := 0.0
 	if v := c.Query("t"); v != "" {
 		f, err := strconv.ParseFloat(v, 64)
@@ -192,13 +265,15 @@ func (t *Transcoder) Stream(c *gin.Context, file string, src io.Reader, openHead
 	}
 	if err != nil {
 		t.log.Warn("ffprobe failed; re-encoding everything", "error", err)
+	} else if pr.Height > 0 && mediaID != "" {
+		t.heights.Store(mediaID, pr.Height)
 	}
 
 	in := file
 	if in == "" {
 		in = "pipe:0"
 	}
-	cmd := exec.CommandContext(ctx, t.ffmpeg, ffmpegArgs(in, "pipe:1", start, pr, true)...)
+	cmd := exec.CommandContext(ctx, t.ffmpeg, ffmpegArgs(in, "pipe:1", start, pr, true, height, t.threads)...)
 	if file == "" {
 		cmd.Stdin = src
 	}
@@ -216,6 +291,39 @@ func (t *Transcoder) Stream(c *gin.Context, file string, src io.Reader, openHead
 	case err != nil:
 		t.log.Warn("transcode failed", "error", err, "stderr", strings.TrimSpace(stderr.String()))
 	}
+}
+
+// Qualities returns the ?quality= values worth offering for a media item,
+// from the cached source height. Unknown height: a downloaded file (file
+// != "") is probed now (local disk, fast); a download in progress gets a
+// background probe of its head (openHead) and this answer offers every
+// rendition. Renditions are never pre-encoded nor cached on disk: each is
+// produced live on request (CPU on a shared box).
+func (t *Transcoder) Qualities(ctx context.Context, mediaID, file string, openHead func() io.ReadCloser) []string {
+	if v, ok := t.heights.Load(mediaID); ok {
+		return qualitiesFor(v.(int))
+	}
+	if file != "" {
+		pr, err := t.probe(ctx, file, nil)
+		if err == nil && pr.Height > 0 {
+			t.heights.Store(mediaID, pr.Height)
+		}
+		return qualitiesFor(pr.Height)
+	}
+	if openHead != nil {
+		if _, busy := t.probing.LoadOrStore(mediaID, struct{}{}); !busy {
+			go func() {
+				defer t.probing.Delete(mediaID)
+				head := openHead()
+				defer head.Close()
+				pr, err := t.probe(context.Background(), "", io.LimitReader(head, probeHeadBytes))
+				if err == nil && pr.Height > 0 {
+					t.heights.Store(mediaID, pr.Height)
+				}
+			}()
+		}
+	}
+	return qualitiesFor(0)
 }
 
 // Convert writes a complete, seekable (faststart) MP4 of src to dst,
@@ -241,7 +349,7 @@ func (t *Transcoder) Convert(ctx context.Context, src, dst string) error {
 		}
 	}()
 
-	cmd := exec.CommandContext(ctx, t.ffmpeg, ffmpegArgs(src, tmpName, 0, pr, false)...)
+	cmd := exec.CommandContext(ctx, t.ffmpeg, ffmpegArgs(src, tmpName, 0, pr, false, 0, 0)...)
 	stderr := &headBuffer{max: stderrKeep}
 	cmd.Stderr = stderr
 	if err := cmd.Run(); err != nil {
@@ -297,6 +405,17 @@ func (t *Transcoder) CachePostProcess(e *Engine) PostProcessFunc {
 		}()
 		return nil
 	}
+}
+
+// cancelReadCloser releases a context together with its reader.
+type cancelReadCloser struct {
+	io.ReadCloser
+	cancel context.CancelFunc
+}
+
+func (r cancelReadCloser) Close() error {
+	r.cancel()
+	return r.ReadCloser.Close()
 }
 
 // headBuffer keeps the first max bytes written (ffmpeg error output).

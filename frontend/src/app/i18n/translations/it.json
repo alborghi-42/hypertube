@@ -241,8 +241,11 @@
     "errorTitle": "Impossibile caricare lo stream",
     "errorBody": "Il server non è riuscito ad avviare questo video.",
     "downloading": "Il server sta ancora scaricando questo film: la riproduzione potrebbe fermarsi finché non recupera.",
-    "transcoded": "Questo file viene convertito al volo: puoi spostarti solo nella parte già caricata.",
+    "transcoded": "Questo flusso viene codificato al volo: saltare fuori dalla parte caricata lo fa ripartire da quel punto.",
     "subtitlesLoading": "Ricerca dei sottotitoli...",
-    "noSubtitles": "Nessun sottotitolo disponibile per questo film."
+    "noSubtitles": "Nessun sottotitolo disponibile per questo film.",
+    "quality": "Qualità",
+    "qualityOriginal": "Originale",
+    "qualityBusy": "Il server sta già convertendo altri flussi: riprova tra qualche secondo o torna a Originale."
   }
 }

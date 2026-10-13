@@ -318,9 +318,14 @@ func (h *Handler) playMedia(c *gin.Context) {
 	internalID := InternalID(externalID, name)
 	ctx := c.Request.Context()
 	transcoded := false // set from the file being served, before resp
+	var qualities []string
 	resp := func(status int, state, msg string) {
+		if len(qualities) == 0 {
+			qualities = []string{QualityOriginal}
+		}
 		c.JSON(status, MediaStream{
 			Transcoded: transcoded,
+			Qualities:  qualities,
 			InternalID: internalID,
 			ExternalID: externalID,
 			Provider:   name,
@@ -367,6 +372,7 @@ func (h *Handler) playMedia(c *gin.Context) {
 		if abs, ok := h.engine.AbsPath(m.LocalPath); ok {
 			if _, err := os.Stat(abs); err == nil {
 				transcoded = NeedsConversion(m.LocalPath)
+				qualities = h.tx.Qualities(ctx, internalID, abs, nil)
 				resp(http.StatusOK, "available", "Media already downloaded")
 				return
 			}
@@ -381,6 +387,14 @@ func (h *Handler) playMedia(c *gin.Context) {
 	}
 
 	transcoded = NeedsConversion(job.RelPath)
+	// Head probe in the background (the reader blocks on torrent pieces);
+	// until it lands every rendition is offered.
+	qualities = h.tx.Qualities(ctx, internalID, "", func() io.ReadCloser {
+		hr := job.file.NewReader()
+		pctx, cancel := context.WithTimeout(context.Background(), 2*probeTimeout)
+		hr.SetContext(pctx)
+		return cancelReadCloser{hr, cancel}
+	})
 	timer := time.NewTimer(15 * time.Second)
 	defer timer.Stop()
 	select {
@@ -404,6 +418,14 @@ func (h *Handler) playMedia(c *gin.Context) {
 // playback (and seeking) works before the download completes.
 func (h *Handler) streamMedia(c *gin.Context) {
 	id := c.Param("mediaId")
+	// ?quality= (42-25): original keeps the paths below untouched; a
+	// downscaled rendition always goes through the live ffmpeg pipe, which
+	// shares the transcode slots (503 + Retry-After when full).
+	height, ok := QualityHeight(c.Query("quality"))
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid quality parameter"})
+		return
+	}
 	// Marks the media as in use (the retention job skips it) and bumps
 	// last_watched_at, at most once a minute per media.
 	defer h.engine.inUse.begin(id)()
@@ -414,8 +436,8 @@ func (h *Handler) streamMedia(c *gin.Context) {
 		defer r.Close()
 		r.SetContext(c.Request.Context())
 		r.SetReadahead(8 << 20)
-		if NeedsConversion(j.RelPath) {
-			h.tx.Stream(c, "", r, func() io.ReadCloser {
+		if height > 0 || NeedsConversion(j.RelPath) {
+			h.tx.Stream(c, id, height, "", r, func() io.ReadCloser {
 				hr := j.file.NewReader()
 				hr.SetContext(c.Request.Context())
 				return hr
@@ -448,8 +470,8 @@ func (h *Handler) streamMedia(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Media not available"})
 		return
 	}
-	if NeedsConversion(abs) {
-		h.tx.Stream(c, abs, nil, nil)
+	if height > 0 || NeedsConversion(abs) {
+		h.tx.Stream(c, id, height, abs, nil, nil)
 		return
 	}
 	if m.MimeType != "" {

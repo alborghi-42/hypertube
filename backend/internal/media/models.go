@@ -62,6 +62,11 @@ type MediaStream struct {
 	// Transcoded streams are converted on the fly (fragmented MP4): no
 	// byte-range seeking; reload the url with ?t=<seconds> to seek.
 	Transcoded bool `json:"transcoded"`
+	// Qualities lists the ?quality= values of the stream url (42-25):
+	// "original" first, then downscaled renditions below the source height
+	// (all of them while the height is not probed yet). Any value other
+	// than original is encoded on the fly, like a transcoded stream.
+	Qualities []string `json:"qualities"`
 	// Subtitles already cached; more may follow (GET /api/media/subtitles).
 	Subtitles []Subtitle `json:"subtitles"`
 }

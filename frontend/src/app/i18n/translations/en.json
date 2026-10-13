@@ -241,8 +241,11 @@
     "errorTitle": "Unable to load stream",
     "errorBody": "The server could not start this video.",
     "downloading": "The server is still downloading this film: playback may pause while it catches up.",
-    "transcoded": "This file is converted on the fly: seeking only works within the part already loaded.",
+    "transcoded": "This stream is encoded on the fly: jumping outside the loaded part restarts it from that point.",
     "subtitlesLoading": "Looking for subtitles...",
-    "noSubtitles": "No subtitles available for this film."
+    "noSubtitles": "No subtitles available for this film.",
+    "quality": "Quality",
+    "qualityOriginal": "Original",
+    "qualityBusy": "The server is busy converting other streams: try again in a few seconds or switch back to Original."
   }
 }

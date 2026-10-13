@@ -128,6 +128,7 @@ each one). In compose, `.env` feeds both variable substitution and the backend's
 | `TRUSTED_PROXIES` | _(empty)_ | comma-separated IPs/CIDRs whose `X-Forwarded-For` is trusted (production: the k3s pod CIDR, e.g. `10.42.0.0/16`); empty = trust nobody, so per-IP rate limits see the proxy IP |
 | `FFMPEG_PATH` / `FFPROBE_PATH` | from `PATH` | ffmpeg binaries |
 | `MAX_TRANSCODES` | `2` | concurrent on-the-fly conversions |
+| `SCALE_THREADS` | `4` | encoder threads per downscaled stream (`?quality=720p\|480p\|360p`, counted in `MAX_TRANSCODES`; not cached on disk) |
 
 OAuth callback URLs to register at the providers: `PUBLIC_URL + BASE_PATH + /api/auth/42/callback`
 `.../api/auth/github/callback` and `.../api/auth/google/callback` (plus

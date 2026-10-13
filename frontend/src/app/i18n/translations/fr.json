@@ -241,8 +241,11 @@
     "errorTitle": "Impossible de charger le flux",
     "errorBody": "Le serveur n'a pas pu démarrer cette vidéo.",
     "downloading": "Le serveur télécharge encore ce film : la lecture peut se mettre en pause le temps de rattraper.",
-    "transcoded": "Ce fichier est converti à la volée : on ne peut avancer que dans la partie déjà chargée.",
+    "transcoded": "Ce flux est encodé à la volée : sauter hors de la partie chargée le relance à partir de ce point.",
     "subtitlesLoading": "Recherche de sous-titres...",
-    "noSubtitles": "Aucun sous-titre disponible pour ce film."
+    "noSubtitles": "Aucun sous-titre disponible pour ce film.",
+    "quality": "Qualité",
+    "qualityOriginal": "Originale",
+    "qualityBusy": "Le serveur convertit déjà d’autres flux : réessayez dans quelques secondes ou revenez à Originale."
   }
 }

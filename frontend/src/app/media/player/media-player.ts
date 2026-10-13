@@ -23,6 +23,9 @@ import { MediaApi, type SubtitleTrack } from '../media-api';
 /** Delays (ms) of the subtitle polls after play: the server fetches them in the background. */
 const SUBTITLE_POLLS = [4000, 12000, 30000];
 
+/** The untouched rendition: range streaming, or the plain on-the-fly conversion. */
+const QUALITY_ORIGINAL = 'original';
+
 /**
  * Video player for one media item: asks the backend to make it playable (/api/media/play,
  * which starts the torrent download if needed) and streams the returned URL. Browser only:
@@ -97,6 +100,54 @@ export class MediaPlayer {
   readonly downloading = computed(() => this.stream.value()?.status === 'downloading');
   readonly transcoded = computed(() => this.stream.value()?.transcoded === true);
 
+  /** `?quality=` values offered by the server; "original" alone hides the selector. */
+  readonly qualities = computed(() => {
+    const list = this.stream.value()?.qualities ?? [];
+    return list.length > 0 ? list : [QUALITY_ORIGINAL];
+  });
+  /** Selected rendition; back to original for every new stream. */
+  readonly quality = linkedSignal({
+    source: () => this.stream.value()?.url,
+    computation: () => QUALITY_ORIGINAL,
+  });
+  /** Absolute start (s) of the current server-encoded stream, sent as `?t=`. */
+  readonly startAt = linkedSignal({ source: () => this.stream.value()?.url, computation: () => 0 });
+  /** Server-encoded stream (mkv conversion or a downscaled rendition): seek by reloading. */
+  readonly serverSeek = computed(() => this.transcoded() || this.quality() !== QUALITY_ORIGINAL);
+  /** Set when a server-encoded stream fails (typically 503: all conversion slots busy). */
+  readonly streamFailed = signal(false);
+
+  /** The <video> src: the play url plus `?quality=` / `?t=` for server-encoded streams. */
+  readonly src = computed(() => {
+    const base = this.stream.value()?.url;
+    if (base === undefined) {
+      return '';
+    }
+    const params: string[] = [];
+    if (this.quality() !== QUALITY_ORIGINAL) {
+      params.push(`quality=${encodeURIComponent(this.quality())}`);
+    }
+    if (this.serverSeek() && this.startAt() > 0) {
+      params.push(`t=${this.startAt()}`);
+    }
+    return params.length === 0
+      ? base
+      : `${base}${base.includes('?') ? '&' : '?'}${params.join('&')}`;
+  });
+
+  /**
+   * Offset between the film's timeline and the element's currentTime. The server shifts
+   * `?t=` streams with -output_ts_offset so this stays 0; if a browser still rebases the
+   * piped stream to 0, it becomes startAt and the subtitle cues are shifted to match.
+   */
+  private timeBase = 0;
+  /** First timeupdate of a `?t=` stream decides timeBase. */
+  private detectBase = false;
+  /** Position to restore with currentTime once a range-seekable stream has metadata. */
+  private pendingSeek = 0;
+  /** Seconds each TextTrack's cues are currently shifted by. */
+  private cueShift = new WeakMap<TextTrack, number>();
+
   constructor() {
     inject(DestroyRef).onDestroy(() => this.stopPolling());
     // A <track default> added after the video started is not always activated by the
@@ -124,6 +175,117 @@ export class MediaPlayer {
 
   retry(): void {
     this.stream.reload();
+  }
+
+  /** Switches rendition, keeping the playback position. */
+  selectQuality(value: string): void {
+    if (value === this.quality() || !this.qualities().includes(value)) {
+      return;
+    }
+    const position = this.position();
+    this.quality.set(value);
+    this.reloadAt(position);
+  }
+
+  /** Restarts the current server-encoded stream, or the original, at the given second. */
+  private reloadAt(position: number): void {
+    this.streamFailed.set(false);
+    const seconds = Math.max(0, Math.floor(position));
+    if (this.serverSeek()) {
+      this.pendingSeek = 0;
+      this.startAt.set(seconds);
+      this.detectBase = seconds > 0;
+      this.timeBase = 0;
+    } else {
+      this.startAt.set(0);
+      this.detectBase = false;
+      this.timeBase = 0;
+      this.pendingSeek = position;
+    }
+    this.applyCueShift();
+  }
+
+  /** Current position on the film's timeline. */
+  private position(): number {
+    const el = this.video()?.nativeElement;
+    return el === undefined ? 0 : this.timeBase + el.currentTime;
+  }
+
+  onLoadedMetadata(): void {
+    const el = this.video()?.nativeElement;
+    if (el !== undefined && this.pendingSeek > 0) {
+      el.currentTime = this.pendingSeek;
+      this.pendingSeek = 0;
+    }
+  }
+
+  onTimeUpdate(): void {
+    const el = this.video()?.nativeElement;
+    if (!this.detectBase || el === undefined || el.currentTime <= 0) {
+      return;
+    }
+    this.detectBase = false;
+    const start = this.startAt();
+    // Absolute timeline (the -output_ts_offset worked): currentTime is near start.
+    this.timeBase = el.currentTime >= start - 2 ? 0 : start;
+    this.applyCueShift();
+  }
+
+  /**
+   * A server-encoded stream cannot be range-seeked: a seek outside what is already buffered
+   * reloads it from the server at that position (`?t=`).
+   */
+  onSeeking(): void {
+    const el = this.video()?.nativeElement;
+    if (el === undefined || !this.serverSeek() || this.detectBase) {
+      return;
+    }
+    const target = el.currentTime;
+    const buffered = el.buffered;
+    for (let i = 0; i < buffered.length; i++) {
+      if (target >= buffered.start(i) && target <= buffered.end(i)) {
+        return;
+      }
+    }
+    this.reloadAt(this.timeBase + target);
+  }
+
+  onVideoError(): void {
+    if (this.serverSeek()) {
+      this.streamFailed.set(true);
+    }
+  }
+
+  /** A <track> (re)loaded its cues: they start unshifted. */
+  onTrackLoad(event: Event): void {
+    const track = (event.target as HTMLTrackElement | null)?.track;
+    if (track !== undefined) {
+      this.cueShift.set(track, 0);
+    }
+    this.applyCueShift();
+  }
+
+  /** Moves every loaded cue so it matches the element's timeline (film time - timeBase). */
+  private applyCueShift(): void {
+    const tracks = this.video()?.nativeElement.textTracks;
+    if (tracks === undefined) {
+      return;
+    }
+    const wanted = -this.timeBase;
+    for (const track of Array.from(tracks)) {
+      const cues = track.cues;
+      if (cues === null || cues.length === 0) {
+        continue;
+      }
+      const delta = wanted - (this.cueShift.get(track) ?? 0);
+      if (delta !== 0) {
+        for (const cue of Array.from(cues)) {
+          cue.startTime += delta;
+          cue.endTime += delta;
+        }
+      }
+      this.cueShift.set(track, wanted);
+    }
   }
 
   private stopPolling(): void {

@@ -1,6 +1,6 @@
 :host {
   display: block;
-  min-height: 100vh;
+  flex: 1;
   background:
     radial-gradient(circle at 12% -5%, oklch(from var(--ht-accent) l c h / 0.22), transparent 28rem),
     linear-gradient(var(--ht-border) 1px, transparent 1px),
@@ -38,26 +38,6 @@
 }
 
 .hypertube-header {
-  position: relative;
-
-  .logout-button {
-    position: absolute;
-    top: 0;
-    right: 0;
-    padding: 0.4rem 0.8rem;
-    border: 1px solid var(--ht-border-bold);
-    border-radius: var(--ht-radius-sm);
-    background: transparent;
-    color: var(--ht-text-1);
-    font: inherit;
-    cursor: pointer;
-
-    &:hover {
-      color: var(--ht-text-0);
-      border-color: var(--ht-accent);
-    }
-  }
-
   h1 {
     font-family: var(--ht-font-display);
     font-weight: 800;

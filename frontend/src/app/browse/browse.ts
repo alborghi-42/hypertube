@@ -13,9 +13,7 @@ import {
   viewChild,
   type ElementRef,
 } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
-
-import { AuthService } from '../auth/auth.service';
+import { ActivatedRoute } from '@angular/router';
 
 import { MediaComments } from '../media/comments/media-comments';
 import { DEFAULT_PROVIDER, MediaApi, type MediaDetails, type MediaDoc, type MediaListParams } from '../media/media-api';
@@ -54,8 +52,6 @@ export class Browse {
   private readonly api = inject(MediaApi);
   private readonly location = inject(Location);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
-  private readonly auth = inject(AuthService);
-  private readonly router = inject(Router);
 
   private searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly mediaPageCache = new Map<string, MediaDoc[]>();
@@ -232,14 +228,6 @@ export class Browse {
       this.resetFeed();
       this.searchDebounceTimer = null;
     }, 250);
-  }
-
-  async logout(): Promise<void> {
-    try {
-      await this.auth.logout();
-    } finally {
-      await this.router.navigateByUrl('/login');
-    }
   }
 
   selectCategory(category: string): void {

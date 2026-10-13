@@ -1,0 +1,32 @@
+<header class="app-header">
+  <a class="brand" routerLink="/" aria-label="Hypertube library">Hypertube</a>
+
+  <nav class="actions" aria-label="Main">
+    <label class="sr-only" for="app-language">Language</label>
+    <select id="app-language" class="language" (change)="onLanguageChange($event)">
+      @for (lang of languages; track lang.code) {
+        <option
+          [value]="lang.code"
+          [selected]="lang.code === language.current()"
+          [attr.aria-label]="lang.label"
+        >
+          {{ lang.code.toUpperCase() }}
+        </option>
+      }
+    </select>
+
+    @if (user(); as current) {
+      <a class="avatar" routerLink="/profile" [attr.aria-label]="'Profile of ' + current.username">
+        @if (current.avatar_url) {
+          <img [src]="current.avatar_url" alt="" width="36" height="36" />
+        } @else {
+          <span aria-hidden="true">{{ initials() }}</span>
+        }
+      </a>
+      <button type="button" class="button" (click)="logout()">Log out</button>
+    } @else {
+      <a class="link" routerLink="/login">Log in</a>
+      <a class="button" routerLink="/register">Sign up</a>
+    }
+  </nav>
+</header>

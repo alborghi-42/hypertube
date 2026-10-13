@@ -62,7 +62,7 @@ func mediaFromRow(r repository.Medium) *Media {
 		ExternalID:      r.ExternalID,
 		Provider:        r.Provider,
 		Title:           r.Title,
-		Description:     deref(r.Description),
+		Description:     PlainText(deref(r.Description)),
 		Creator:         deref(r.Creator),
 		Date:            deref(r.Date),
 		Year:            mediaYear(deref(r.Date)),

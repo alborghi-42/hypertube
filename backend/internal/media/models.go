@@ -107,6 +107,7 @@ type archiveMetadataFile struct {
 	Name   string `json:"name"`
 	Format string `json:"format"`
 	Source string `json:"source"`
+	Length string `json:"length"` // seconds ("713.62") or a clock ("12:03")
 }
 
 type archiveMetadata struct {
@@ -119,6 +120,7 @@ type archiveMetadata struct {
 		Date        string `json:"date"`
 		PublicDate  string `json:"publicdate"`
 		Identifier  string `json:"identifier"`
+		Runtime     string `json:"runtime"`
 	} `json:"metadata"`
 }
 

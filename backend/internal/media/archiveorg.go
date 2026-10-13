@@ -75,6 +75,16 @@ func (a *ArchiveOrg) fetchMetadata(ctx context.Context, id string) (*archiveMeta
 	return &result, nil
 }
 
+// Duration reads an item's runtime from its archive.org metadata (used when
+// OMDB has no runtime for a cached row); 0 when unknown.
+func (a *ArchiveOrg) Duration(ctx context.Context, id string) (float64, error) {
+	result, err := a.fetchMetadata(ctx, id)
+	if err != nil {
+		return 0, err
+	}
+	return archiveDuration(result.Metadata.Runtime, result.Files), nil
+}
+
 // FetchByID returns a single item's metadata, enriched with OMDB stats.
 func (a *ArchiveOrg) FetchByID(ctx context.Context, id string) (*Media, error) {
 	result, err := a.fetchMetadata(ctx, id)
@@ -107,7 +117,7 @@ func (a *ArchiveOrg) FetchByID(ctx context.Context, id string) (*Media, error) {
 		ExternalID:   externalID,
 		Provider:     a.ID(),
 		Title:        title,
-		Description:  md.Description,
+		Description:  PlainText(md.Description),
 		Creator:      md.Creator,
 		Date:         date,
 		Year:         mediaYear(md.Date),
@@ -120,6 +130,9 @@ func (a *ArchiveOrg) FetchByID(ctx context.Context, id string) (*Media, error) {
 		a.log.Warn("OMDB stats unavailable", "title", md.Title, "error", err)
 	}
 	applyOMDB(m, info)
+	if m.DurationSeconds == 0 {
+		m.DurationSeconds = archiveDuration(md.Runtime, result.Files)
+	}
 	return m, nil
 }
 
@@ -184,7 +197,7 @@ func (a *ArchiveOrg) search(ctx context.Context, lucene, sortBy string, page, ro
 			ExternalID:  item.Identifier,
 			Provider:    a.ID(),
 			Title:       item.Title,
-			Description: item.Description,
+			Description: PlainText(item.Description),
 			Creator:     item.Creator,
 			Date:        date,
 			// publicdate is the upload date, not the production year.

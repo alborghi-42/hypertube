@@ -248,6 +248,21 @@ func (h *Handler) getMediaDetails(c *gin.Context) {
 	}
 
 	EnrichDetails(ctx, h.store, h.omdbKey, h.log, m)
+	if m.DurationSeconds == 0 {
+		// No OMDB runtime: ask the provider (archive.org has its own runtime).
+		if p, ok := h.providers[m.Provider]; ok {
+			if dp, ok := p.(interface {
+				Duration(context.Context, string) (float64, error)
+			}); ok {
+				if d, err := dp.Duration(ctx, m.ExternalID); err == nil && d > 0 {
+					m.DurationSeconds = d
+					if err := h.store.SetDuration(ctx, m.ID, d); err != nil {
+						h.log.Error("store duration failed", "media_id", m.ID, "error", err)
+					}
+				}
+			}
+		}
+	}
 	c.JSON(http.StatusOK, m)
 }
 
